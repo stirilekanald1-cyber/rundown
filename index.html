@@ -259,12 +259,17 @@
   #observatiiText::placeholder { color: #2a5a8a; font-style: italic; }
   #observatiiText:focus { border-color: #3a7add; box-shadow: 0 0 8px #1464c840; background: rgba(8,22,55,0.95); }
 
-  /* Viewer mode — blochează orice modificare */
+  /* Viewer mode — blochează orice modificare și ascunde elementele de editare */
   body.viewer-mode input { pointer-events: none; }
   body.viewer-mode td button { display: none; }
-  body.viewer-mode .add-buttons { display: none; }
-  body.viewer-mode #editorControls { display: none; }
+  body.viewer-mode .add-buttons { display: none !important; }
+  body.viewer-mode #editorControls { display: none !important; }
   body.viewer-mode #observatiiText { pointer-events: none; }
+  body.viewer-mode #viewerBanner { display: none !important; }
+  body.viewer-mode #timerSection { display: none !important; }
+  body.viewer-mode .settings { display: none !important; }
+  body.viewer-mode .clock-row label { display: none !important; }
+  body.viewer-mode #logoutBtn { display: none !important; }
 </style>
 </head>
 <body>
@@ -375,6 +380,7 @@
   </div>
 </div>
 
+<div id="timerSection">
 <hr>
 <h3>⏱ Cronometre</h3>
 <div class="cronometru">
@@ -388,6 +394,7 @@
   <button onclick="startTimer2()">Start</button>
   <button onclick="stopTimer2()">Stop</button>
   <button onclick="resetTimer2()">Reset</button>
+</div>
 </div>
 
 <div id="observatiiSection">
@@ -866,10 +873,6 @@ function getCurrentState() {
     scoase        : scoaseList
   };
 }
-function saveToCloud() {
-  if (isViewerMode) return;
-  if (window._fbSave) window._fbSave(getCurrentState());
-}
 function saveData() {
   var today=new Date(); var yyyy=today.getFullYear(); var mm=String(today.getMonth()+1).padStart(2,'0'); var dd=String(today.getDate()).padStart(2,'0');
   var blob=new Blob([JSON.stringify(getCurrentState(),null,2)],{type:'application/json'});
@@ -896,6 +899,16 @@ function handleImport(event) {
 function updateAndSave()       { update(); saveToCloud(); }
 function normalizeAndSave(inp) { normalizeInput(inp); saveToCloud(); }
 
+// Debounce: salvează în Firebase după 800ms de inactivitate
+// Rezolvă problema sincronizării când se adaugă mai multe știri rapid
+var _saveTimer = null;
+function saveToCloud() {
+  if (isViewerMode) return;
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(function() {
+    if (window._fbSave) window._fbSave(getCurrentState());
+  }, 800);
+}
 function resetPage() {
   if (isViewerMode) return;
   if (confirm('Sigur vrei să resetezi pagina și să ștergi toate datele?')) {
@@ -916,7 +929,8 @@ function closeJurnal() {
   if (!confirm('Închizi jurnalul de azi?\n\nSe va descărca JSON-ul automat și Firebase se va reseta pentru jurnalul de mâine.')) return;
   // 1. Descarcă JSON
   saveData();
-  // 2. Șterge din Firebase și resetează interfața
+  // 2. Anulează orice save pending și șterge din Firebase imediat
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
   setTimeout(function() {
     if (window._fbSave) window._fbSave(null);
     document.querySelector('#table tbody').innerHTML=''; scoaseList=[]; renderScoase();
