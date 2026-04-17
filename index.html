@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>KANAL D</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+
+  /* ══════════════════════════════════════════════
+     LOGIN OVERLAY
+  ══════════════════════════════════════════════ */
+  #loginOverlay {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 60% 30%, #0a1a3a 0%, #04090f 60%, #000 100%);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  #loginBox {
+    background: rgba(10,30,70,0.95);
+    border: 1px solid #2a6abf; border-radius: 10px;
+    padding: 36px 40px; width: 360px; text-align: center;
+    box-shadow: 0 0 40px #1464c840;
+  }
+  #loginBox .login-logo {
+    background: linear-gradient(135deg, #1464c8 0%, #0a3a7a 100%);
+    border-radius: 6px; padding: 6px 18px;
+    font-size: 26px; font-weight: 900; color: #fff;
+    letter-spacing: 1px; border: 2px solid #2a80e8;
+    box-shadow: 0 0 14px #1464c880;
+    display: inline-flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  #loginBox .login-logo-icon {
+    width: 28px; height: 28px;
+    background: radial-gradient(circle, #6ab0ff 30%, #1464c8 100%);
+    border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #6ab0ff88;
+  }
+  #loginBox h2 { color: #7ec8ff; font-size: 16px; margin: 8px 0 24px; font-weight: 400; letter-spacing: 1px; }
+  #loginBox input {
+    width: 100%; background: #071828; border: 1px solid #2a6abf;
+    color: #fff; border-radius: 5px; padding: 10px 14px;
+    font-size: 15px; margin-bottom: 12px; letter-spacing: 2px;
+  }
+  #loginBox input:focus { outline: none; border-color: #5bb8ff; }
+  #loginBox button {
+    width: 100%; background: linear-gradient(135deg, #1464c8 0%, #0a3a7a 100%);
+    color: #fff; border: 1px solid #2a80e8; border-radius: 5px;
+    padding: 10px; font-size: 15px; font-weight: bold;
+    cursor: pointer; letter-spacing: 1px; transition: background 0.15s, box-shadow 0.15s;
+  }
+  #loginBox button:hover { background: linear-gradient(135deg, #2a80e8 0%, #1464c8 100%); box-shadow: 0 0 10px #1464c880; }
+  #loginError { color: #ff6060; font-size: 13px; margin-top: 8px; min-height: 18px; }
+  #loginBox .login-hint { color: #3a6a9a; font-size: 11px; margin-top: 16px; }
+
+  /* ══════════════════════════════════════════════
+     LOADING OVERLAY
+  ══════════════════════════════════════════════ */
+  #loadingOverlay {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 60% 30%, #0a1a3a 0%, #04090f 60%, #000 100%);
+    display: none; align-items: center; justify-content: center;
+    z-index: 9998; flex-direction: column; gap: 18px;
+  }
+  #loadingOverlay .load-logo {
+    background: linear-gradient(135deg, #1464c8 0%, #0a3a7a 100%);
+    border-radius: 6px; padding: 6px 18px;
+    font-size: 26px; font-weight: 900; color: #fff;
+    letter-spacing: 1px; border: 2px solid #2a80e8;
+    box-shadow: 0 0 14px #1464c880;
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  #loadingOverlay .load-logo-icon {
+    width: 28px; height: 28px;
+    background: radial-gradient(circle, #6ab0ff 30%, #1464c8 100%);
+    border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #6ab0ff88;
+  }
+  #loadingOverlay p { color: #5bb8ff; font-size: 14px; letter-spacing: 1px; margin: 0; }
+  .load-spinner {
+    width: 36px; height: 36px; border: 3px solid #1a4a8a;
+    border-top-color: #5bb8ff; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ══════════════════════════════════════════════
+     VIEWER BANNER
+  ══════════════════════════════════════════════ */
+  #viewerBanner {
+    display: none;
+    background: linear-gradient(90deg, #0a2800 0%, #051400 100%);
+    border-bottom: 2px solid #2a8a2a;
+    color: #88dd88; font-size: 13px; font-weight: bold;
+    padding: 6px 20px; text-align: center; letter-spacing: 1px;
+  }
+
+  /* ══════════════════════════════════════════════
+     BODY / LAYOUT
+  ══════════════════════════════════════════════ */
+  body {
+    font-family: 'Inter', Arial, sans-serif;
+    margin: 0; padding: 16px 20px;
+    background: radial-gradient(ellipse at 60% 30%, #0a1a3a 0%, #04090f 60%, #000 100%);
+    min-height: 100vh; color: #cce4ff;
+  }
+
+  .header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 6px;
+  }
+  .logo {
+    background: linear-gradient(135deg, #1464c8 0%, #0a3a7a 100%);
+    border-radius: 6px; padding: 4px 12px;
+    font-size: 22px; font-weight: 900; color: #fff;
+    letter-spacing: 1px; border: 2px solid #2a80e8;
+    box-shadow: 0 0 14px #1464c880;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: radial-gradient(circle, #6ab0ff 30%, #1464c8 100%);
+    border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #6ab0ff88;
+  }
+  h2 { margin: 0; font-size: 20px; font-weight: 700; color: #7ec8ff; letter-spacing: 1px; text-shadow: 0 0 8px #1464c8; }
+
+  /* Sync status */
+  #syncStatus { font-size: 11px; color: #3a7add; margin-left: auto; display: flex; align-items: center; gap: 4px; }
+  #syncDot { width: 7px; height: 7px; border-radius: 50%; background: #3a7add; display: inline-block; transition: background 0.3s; }
+  #syncDot.synced { background: #4ada6a; }
+  #syncDot.error  { background: #ff4040; }
+
+  /* Logout / Close journal buttons */
+  #logoutBtn {
+    background: rgba(60,20,20,0.7); border: 1px solid #5a2a2a;
+    color: #ff8888; font-size: 11px; padding: 3px 10px;
+    border-radius: 4px; cursor: pointer;
+  }
+  #logoutBtn:hover { background: rgba(100,30,30,0.9); color: #ffaaaa; }
+  #closeJurnalBtn {
+    background: linear-gradient(135deg, #7a4a00 0%, #4a2a00 100%);
+    border: 1px solid #c87a00; color: #ffd080;
+    font-size: 12px; font-weight: bold; padding: 4px 12px;
+    border-radius: 4px; cursor: pointer;
+  }
+  #closeJurnalBtn:hover { background: linear-gradient(135deg, #c87a00 0%, #7a4a00 100%); color: #fff; box-shadow: 0 0 8px #c87a0080; }
+
+  #clock { font-size: 18px; font-weight: bold; color: #5bb8ff; margin-bottom: 10px; text-shadow: 0 0 6px #1464c8; letter-spacing: 2px; }
+  .clock-row { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+  .clock-row #clock { margin-bottom: 0; }
+  .clock-row label { font-size: 13px; color: #ffffff; display: flex; align-items: center; gap: 4px; font-weight: 500; }
+  .clock-row input { background: #071828; border: 1px solid #2a6abf; color: #ffffff; border-radius: 3px; padding: 4px 8px; font-size: 13px; width: 70px; font-weight: 500; }
+  .clock-row input:focus { outline: none; border-color: #5bb8ff; box-shadow: 0 0 5px #1464c880; }
+
+  .settings {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin-bottom: 10px; background: rgba(10,40,90,0.55);
+    border: 1px solid #1a4a8a; border-radius: 6px; padding: 8px 12px;
+  }
+  .settings label { font-size: 13px; color: #ffffff; display: flex; align-items: center; gap: 4px; font-weight: 500; }
+  .settings input { background: #071828; border: 1px solid #2a6abf; color: #ffffff; border-radius: 3px; padding: 4px 8px; font-size: 13px; width: 90px; font-weight: 500; }
+  .settings input:focus { outline: none; border-color: #5bb8ff; box-shadow: 0 0 5px #1464c880; }
+
+  button {
+    background: linear-gradient(135deg, #1a4a8a 0%, #0d2d5a 100%);
+    color: #b8d8ff; border: 1px solid #2a6abf; border-radius: 4px;
+    padding: 4px 10px; font-size: 12px; cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+  }
+  button:hover { background: linear-gradient(135deg, #2a6abf 0%, #1a4a8a 100%); box-shadow: 0 0 8px #1464c860; color: #fff; }
+  .add-buttons { display: flex; gap: 8px; margin-bottom: 10px; }
+  .add-buttons button { background: linear-gradient(135deg, #174a90 0%, #0a2850 100%); border: 1px solid #3a7add; color: #7ec8ff; font-weight: bold; padding: 5px 14px; }
+  .add-buttons button:hover { background: linear-gradient(135deg, #2060b8 0%, #174a90 100%); color:#fff; }
+
+  table { border-collapse: collapse; width: 100%; margin-top: 4px; font-size: 13px; }
+  thead tr { background: linear-gradient(90deg, #0e2d5c 0%, #0a1e3e 100%); color: #7ec8ff; font-size: 12px; letter-spacing: 0.5px; }
+  th { border: 1px solid #1a4a8a; padding: 7px 6px; text-align: center; font-weight: 700; text-transform: uppercase; }
+  tbody tr { background: rgba(5,15,35,0.75); border-bottom: 1px solid #122040; transition: background 0.12s; }
+  tbody tr:nth-child(even) { background: rgba(10,25,55,0.6); }
+  tbody tr:hover { background: rgba(20,60,120,0.4); }
+  td { border: 1px solid #102040; padding: 4px 5px; text-align: center; color: #FFFFFF; }
+  td input { background: transparent; border: 1px solid transparent; color: #FFFFFF; font-size: 13px; width: 98%; padding: 2px 4px; border-radius: 2px; text-align: center; }
+  td input:focus { outline: none; background: rgba(20,100,200,0.18); border-color: #3a7add; }
+  td input[type="text"]:first-child { text-align: left; }
+  .total, .start, .end { color: #5bb8ff; font-weight: 600; font-size: 13px; }
+
+  .highlight-yellow { background: linear-gradient(90deg, #2a2000 0%, #1a1400 100%) !important; border-left: 3px solid #f0c800 !important; }
+  .highlight-yellow td { color: #f5d020; }
+  .highlight-yellow td input { color: #f5d020; }
+  .highlight-ad-closest { background: linear-gradient(90deg, #0a2a0a 0%, #051405 100%) !important; border-left: 3px solid #00e676 !important; box-shadow: inset 0 0 12px rgba(0,230,118,0.08); }
+  .highlight-ad-closest td { color: #80ffb8 !important; }
+  .highlight-ad-closest td input { color: #80ffb8 !important; }
+  .highlight-ad-closest .total, .highlight-ad-closest .start, .highlight-ad-closest .end { color: #00e676 !important; font-weight: 700; }
+  .finished { background: linear-gradient(90deg, #3a0000 0%, #200000 100%) !important; opacity: 0.7; }
+  .finished td { color: #ff6060 !important; text-decoration: line-through; }
+  .separator td { background: linear-gradient(90deg, #0c2040 0%, #071428 100%); color: #5bb8ff; font-weight: bold; font-size: 12px; letter-spacing: 1px; border: 1px solid #1a4a8a; text-align: center; padding: 5px; }
+
+  .btn-status { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; margin-right: 4px; vertical-align: middle; padding: 0; transition: box-shadow 0.15s; }
+  .btn-status.principala { background: #e03030; box-shadow: 0 0 5px #e0303088; }
+  .btn-status.rezerva { background: #4ab8e8; box-shadow: 0 0 5px #4ab8e888; }
+  .btn-status:hover { filter: brightness(1.3); }
+  td.td-title { display: flex; align-items: center; padding: 4px 5px; }
+  td.td-title input { flex: 1; }
+
+  .controls-row { display: flex; align-items: stretch; gap: 14px; margin-top: 12px; }
+  .controls-row .controls { flex: 1; margin-top: 0; }
+
+  #countdownWidget { background: linear-gradient(145deg, #0a1e42 0%, #050e22 100%); border: 1px solid #1a4a8a; border-radius: 14px; padding: 14px 20px 12px 20px; box-shadow: 0 0 30px #1464c840, 0 4px 24px #000a; min-width: 200px; text-align: center; user-select: none; display: flex; flex-direction: column; justify-content: center; }
+  #countdownWidget .cd-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #ffffff; margin-bottom: 4px; font-weight: 700; }
+  #countdownDisplay { font-size: 42px; font-weight: 900; letter-spacing: 3px; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 0 18px currentColor; transition: color 0.4s; }
+  #countdownDisplay.cd-ok      { color: #4af0a0; }
+  #countdownDisplay.cd-warn    { color: #f0c020; }
+  #countdownDisplay.cd-danger  { color: #ff4444; }
+  #countdownDisplay.cd-over    { color: #ff2222; }
+  #countdownWidget .cd-sublabel { font-size: 11px; color: #ffffff; margin-top: 5px; letter-spacing: 1px; }
+  #cdPauseInfo { font-size: 11px; color: #ffffff; margin-top: 4px; letter-spacing: 0.5px; }
+  #countdownWidget .cd-controls { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+  #countdownWidget .cd-controls button { font-size: 11px; padding: 3px 10px; border-radius: 4px; background: rgba(20,60,120,0.5); border: 1px solid #2a5a9a; color: #7ec8ff; }
+  #countdownWidget .cd-controls button:hover { background: rgba(30,80,160,0.7); color:#fff; }
+
+  td button { padding: 2px 7px; font-size: 11px; margin: 1px; background: rgba(20,60,120,0.5); border: 1px solid #2a5a9a; color: #90c4f8; }
+  td button:hover { background: rgba(30,80,160,0.7); color: #fff; }
+  .btn-finish { background: linear-gradient(135deg, #ff6b35 0%, #cc5428 100%) !important; border: 1px solid #ff8855 !important; color: #fff !important; font-weight: bold; padding: 3px 10px !important; font-size: 12px !important; }
+  .btn-finish:hover { background: linear-gradient(135deg, #ff8855 0%, #ff6b35 100%) !important; box-shadow: 0 0 8px #ff6b3580 !important; color: #fff !important; }
+
+  .controls { margin-top: 12px; background: rgba(8,20,48,0.7); border: 1px solid #1a3a6a; border-radius: 6px; padding: 10px 14px; font-size: 14px; line-height: 1.8; color: #ffffff; }
+  .controls p { margin: 4px 0; }
+  .controls span { color: #6ac8ff; font-weight: bold; }
+
+  hr { border: none; border-top: 1px solid #1a3a6a; margin: 16px 0; }
+  h3 { color: #7ec8ff; margin: 8px 0; font-size: 15px; }
+  .cronometru { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .cronometru span { font-size: 18px; font-weight: bold; color: #5bb8ff; min-width: 60px; text-align: center; background: rgba(10,30,70,0.6); border: 1px solid #2a5a9a; border-radius: 4px; padding: 2px 10px; letter-spacing: 2px; text-shadow: 0 0 8px #1464c8; }
+  .cronometru button { width: 60px; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #050d1a; }
+  ::-webkit-scrollbar-thumb { background: #1a4a8a; border-radius: 4px; }
+
+  #scoaseSection { margin-top: 18px; border: 1px solid #3a1a1a; border-radius: 6px; background: rgba(40,8,8,0.55); overflow: hidden; }
+  #scoaseHeader { display: flex; align-items: center; gap: 10px; background: linear-gradient(90deg, #2a0808 0%, #1a0404 100%); border-bottom: 1px solid #3a1a1a; padding: 8px 14px; cursor: pointer; user-select: none; }
+  #scoaseHeader h3 { margin: 0; font-size: 14px; color: #ff8888; letter-spacing: 1px; }
+  #scoaseBadge { background: #8b0000; color: #ffaaaa; border-radius: 10px; font-size: 11px; font-weight: bold; padding: 1px 8px; min-width: 20px; text-align: center; display: none; }
+  #scoaseToggleIcon { margin-left: auto; color: #ff6666; font-size: 13px; }
+  #scoaseBody { padding: 0; }
+  #scoaseEmpty { color: #664444; font-size: 13px; font-style: italic; padding: 10px 14px; display: block; }
+  .scoasa-row { display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-bottom: 1px solid #2a0a0a; background: rgba(30,5,5,0.5); transition: background 0.12s; }
+  .scoasa-row:last-child { border-bottom: none; }
+  .scoasa-row:hover { background: rgba(50,10,10,0.7); }
+  .scoasa-part-badge { font-size: 10px; font-weight: bold; color: #ff9999; background: rgba(100,0,0,0.4); border: 1px solid #551111; border-radius: 3px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0; }
+  .scoasa-title { color: #cc7777; font-size: 13px; flex: 1; text-decoration: line-through; text-align: left; }
+  .scoasa-durate { color: #885555; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+  .btn-repune { background: linear-gradient(135deg, #1a5a1a 0%, #0d2d0d 100%) !important; border: 1px solid #3a8a3a !important; color: #88dd88 !important; font-weight: bold; font-size: 11px !important; padding: 3px 10px !important; white-space: nowrap; flex-shrink: 0; }
+  .btn-repune:hover { background: linear-gradient(135deg, #2a8a2a 0%, #1a5a1a 100%) !important; box-shadow: 0 0 8px #3a8a3a80 !important; color: #aaffaa !important; }
+
+  #observatiiSection { margin-top: 20px; border: 1px solid #1a4a8a; border-radius: 10px; background: rgba(8,20,52,0.7); overflow: hidden; }
+  #observatiiHeader { display: flex; align-items: center; gap: 10px; background: linear-gradient(90deg, #0e2d5c 0%, #0a1e3e 100%); border-bottom: 1px solid #1a4a8a; padding: 9px 14px; cursor: pointer; user-select: none; }
+  #observatiiHeader h3 { margin: 0; font-size: 13px; font-weight: 700; color: #7ec8ff; letter-spacing: 1.5px; text-transform: uppercase; }
+  #observatiiToggleIcon { margin-left: auto; color: #4a8acc; font-size: 12px; }
+  #observatiiBody { padding: 10px 14px 12px; }
+  #observatiiText { width: 100%; background: rgba(5,15,40,0.8); border: 1px solid #1e4a8a; border-radius: 6px; color: #d0e8ff; font-family: 'Inter', Arial, sans-serif; font-size: 13px; line-height: 1.6; padding: 10px 12px; resize: vertical; min-height: 88px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; letter-spacing: 0.2px; }
+  #observatiiText::placeholder { color: #2a5a8a; font-style: italic; }
+  #observatiiText:focus { border-color: #3a7add; box-shadow: 0 0 8px #1464c840; background: rgba(8,22,55,0.95); }
+
+  /* Viewer mode — blochează orice modificare */
+  body.viewer-mode input { pointer-events: none; }
+  body.viewer-mode td button { display: none; }
+  body.viewer-mode .add-buttons { display: none; }
+  body.viewer-mode #editorControls { display: none; }
+  body.viewer-mode #observatiiText { pointer-events: none; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     LOGIN OVERLAY
+══════════════════════════════════════════════ -->
+<div id="loginOverlay">
+  <div id="loginBox">
+    <div class="login-logo"><span class="login-logo-icon"></span>STIRI</div>
+    <h2>📺 KANAL D — Rundown</h2>
+    <input type="password" id="pwdInput" placeholder="Parolă" onkeydown="if(event.key==='Enter') tryLogin()">
+    <button onclick="tryLogin()">Intră</button>
+    <div id="loginError"></div>
+    <div class="login-hint">Contactează redacția pentru parolă.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     LOADING OVERLAY
+══════════════════════════════════════════════ -->
+<div id="loadingOverlay">
+  <div class="load-logo"><span class="load-logo-icon"></span>STIRI</div>
+  <div class="load-spinner"></div>
+  <p>Se încarcă rundown-ul...</p>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     VIEWER BANNER
+══════════════════════════════════════════════ -->
+<div id="viewerBanner">👁 MOD VIZUALIZARE — nu poți modifica rundown-ul</div>
+
+<!-- ══════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════ -->
+<div class="header">
+  <div class="logo"><span class="logo-icon"></span>STIRI</div>
+  <h2>📺 KANAL D</h2>
+  <div id="syncStatus"><span id="syncDot"></span><span id="syncText">—</span></div>
+  <button id="logoutBtn" onclick="doLogout()" style="margin-left:8px;">🔓 Ieșire</button>
+</div>
+
+<div class="clock-row">
+  <div id="clock">00:00:00</div>
+  <label>Durata jurnal: <input id="jurnalDuration" placeholder="MM:SS" value="35:00" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SETTINGS BAR
+══════════════════════════════════════════════ -->
+<div class="settings">
+  <label>Start jurnal: <input id="startJournal" placeholder="HH:MM:SS" value="18:57:00" onfocus="pushUndo()" onblur="updateAndSave()" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <label>Ora publicitate: <input id="adTime" placeholder="HH:MM:SS" value="19:30:00" onfocus="pushUndo()" onblur="updateAndSave()" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <label>Durata publicitate: <input id="adDuration" placeholder="MM:SS" value="05:00" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <label>Durata planificată Partea 2: <input id="plannedPart2" placeholder="MM:SS" value="04:00" style="width:70px" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <span id="editorControls" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+    <button onclick="saveData()">💾 Salvează JSON</button>
+    <button onclick="importData()">📂 Import JSON</button>
+    <button onclick="resetPage()">🔄 Reset</button>
+    <button onclick="undo()">↩️ Undo (Ctrl+Z)</button>
+    <button id="closeJurnalBtn" onclick="closeJurnal()">📦 Închide jurnalul</button>
+  </span>
+  <input type="file" id="fileInput" style="display:none" accept=".json" onchange="handleImport(event)">
+</div>
+
+<div class="add-buttons">
+  <button onclick="addRowWithUndo('part1')">➕ Adaugă știre Partea 1</button>
+  <button onclick="addRowWithUndo('part2')">➕ Adaugă știre Partea 2</button>
+</div>
+
+<table id="table">
+<thead>
+<tr>
+  <th>#</th><th>Titlu</th><th>Video</th><th>Cap</th><th>Total</th><th>Start</th><th>Sfârșit (ora)</th><th>Acțiuni</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<div class="controls-row">
+  <div class="controls">
+    <p id="part1Totals">Partea 1 - Video: 00:00, Cap: 00:00, Total: 00:00</p>
+    <p id="part2Totals">Partea 2 - Video: 00:00, Cap: 00:00, Total: 00:00</p>
+    <p>Total video: <span id="totalVideo">00:00</span></p>
+    <p>Total capuri: <span id="totalCap">00:00</span></p>
+    <p>Total jurnal: <span id="totalAll">00:00</span></p>
+    <p id="timeLeftPart1"></p>
+    <p id="timeLeftPart2"></p>
+  </div>
+  <div id="countdownWidget">
+    <div class="cd-label">⏳ PÂNĂ LA PAUZĂ</div>
+    <div id="countdownDisplay" class="cd-ok">--:--</div>
+    <div id="cdPauseInfo">pauză la --:--</div>
+    <div class="cd-controls">
+      <button onclick="cdTogglePause()">⏸ Pauză</button>
+    </div>
+  </div>
+</div>
+
+<div id="scoaseSection">
+  <div id="scoaseHeader" onclick="toggleScoase()">
+    <h3>🗑️ ȘTIRI SCOASE</h3>
+    <span id="scoaseBadge">0</span>
+    <span id="scoaseToggleIcon">▼</span>
+  </div>
+  <div id="scoaseBody">
+    <span id="scoaseEmpty">Nicio știre scoasă.</span>
+  </div>
+</div>
+
+<hr>
+<h3>⏱ Cronometre</h3>
+<div class="cronometru">
+  <span id="timer1">00:00</span>
+  <button onclick="startTimer1()">Start</button>
+  <button onclick="stopTimer1()">Stop</button>
+  <button onclick="resetTimer1()">Reset</button>
+</div>
+<div class="cronometru">
+  <span id="timer2">00:00</span>
+  <button onclick="startTimer2()">Start</button>
+  <button onclick="stopTimer2()">Stop</button>
+  <button onclick="resetTimer2()">Reset</button>
+</div>
+
+<div id="observatiiSection">
+  <div id="observatiiHeader" onclick="toggleObservatii()">
+    <h3>📝 Observații</h3>
+    <span id="observatiiToggleIcon">▼</span>
+  </div>
+  <div id="observatiiBody">
+    <textarea id="observatiiText" rows="4" placeholder="Adaugă observații despre jurnal, modificări de ultim moment, note pentru echipă..."></textarea>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     FIREBASE SDK
+══════════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  🔧 CONFIGURARE FIREBASE                                        ║
+// ║  Înlocuiește valorile de mai jos cu cele din Firebase Console:  ║
+// ║  console.firebase.google.com → Project Settings → Web app      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+const firebaseConfig = {
+  apiKey: "AIzaSyCeFIhxZvOTJ3ZxcB9O1fGvMbNcP_-u_C4",
+  authDomain: "kanal-d-rundown.firebaseapp.com",
+  databaseURL: "https://kanal-d-rundown-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "kanal-d-rundown",
+  storageBucket: "kanal-d-rundown.firebasestorage.app",
+  messagingSenderId: "185102941688",
+  appId: "1:185102941688:web:72d2651507669f9c0e2a0d"
+
+};
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  Sfârșit configurare Firebase                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+const rundownRef = ref(db, 'rundown/data');
+
+let ignoreNextRemote = false;
+
+window._fbSave = function(data) {
+  ignoreNextRemote = true;
+  setSyncStatus('saving');
+  set(rundownRef, data)
+    .then(() => { setSyncStatus('synced'); })
+    .catch(() => { setSyncStatus('error'); });
+};
+
+window._fbListen = function() {
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  let firstLoad = true;
+  onValue(rundownRef, (snapshot) => {
+    if (firstLoad) {
+      firstLoad = false;
+      document.getElementById('loadingOverlay').style.display = 'none';
+      const data = snapshot.val();
+      if (data) { setSyncStatus('synced'); loadRemoteData(data); }
+      return;
+    }
+    if (ignoreNextRemote) { ignoreNextRemote = false; return; }
+    const data = snapshot.val();
+    if (!data) return;
+    setSyncStatus('synced');
+    loadRemoteData(data);
+  });
+};
+
+window._startFirebase = function() { window._fbListen(); };
+
+function setSyncStatus(state) {
+  const dot  = document.getElementById('syncDot');
+  const text = document.getElementById('syncText');
+  dot.className = '';
+  if (state === 'synced') { dot.classList.add('synced'); text.innerText = 'Sincronizat ✓'; }
+  else if (state === 'saving') { text.innerText = 'Se salvează...'; }
+  else if (state === 'error')  { dot.classList.add('error'); text.innerText = 'Eroare sync!'; }
+}
+
+function loadRemoteData(obj) {
+  if (!obj) return;
+  document.getElementById('startJournal').value   = obj.startJournal   || '18:57:00';
+  document.getElementById('adTime').value         = obj.adTime         || '19:30:00';
+  document.getElementById('adDuration').value     = obj.adDuration     || '05:00';
+  document.getElementById('plannedPart2').value   = obj.plannedPart2   || '04:00';
+  document.getElementById('jurnalDuration').value = obj.jurnalDuration || '35:00';
+  document.getElementById('observatiiText').value = obj.observatii     || '';
+  document.querySelector('#table tbody').innerHTML = '';
+  (obj.rows || []).forEach(function(d) { window.addRow(d.part, d); });
+  window.scoaseList = obj.scoase || [];
+  window.renderScoase();
+  window.update();
+}
+</script>
+
+
+<!-- ══════════════════════════════════════════════
+     LOGICĂ PRINCIPALĂ
+══════════════════════════════════════════════ -->
+<script>
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  🔐 PAROLE — schimbă-le înainte să publici!                    ║
+// ║  EDITOR_PASSWORD = acces complet (poate edita tot)             ║
+// ║  VIEWER_PASSWORD = doar vizualizare (nu poate modifica nimic)  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+var EDITOR_PASSWORD = "Producatori2026";
+var VIEWER_PASSWORD = "Vizualizare2026";
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  Sfârșit configurare parole                                     ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var SESSION_KEY    = 'kd_rundown_session';
+var SESSION_EDITOR = 'editor';
+var SESSION_VIEWER = 'viewer';
+var isViewerMode   = false;
+
+// ── SESIUNE ──────────────────────────────────────────────────────
+// sessionStorage: rămâne cât timp tab-ul e deschis.
+// La refresh → sesiunea există → sare direct peste login → datele vin din Firebase.
+// La închiderea tab-ului sau la apăsarea "Ieșire" → sesiunea se șterge.
+function saveSession(role) { try { sessionStorage.setItem(SESSION_KEY, role); } catch(e){} }
+function loadSession()     { try { return sessionStorage.getItem(SESSION_KEY); } catch(e){ return null; } }
+function clearSession()    { try { sessionStorage.removeItem(SESSION_KEY); } catch(e){} }
+
+function applyRole(role) {
+  document.getElementById('loginOverlay').style.display = 'none';
+  if (role === SESSION_VIEWER) {
+    isViewerMode = true;
+    document.body.classList.add('viewer-mode');
+    document.getElementById('viewerBanner').style.display = 'block';
+    document.getElementById('logoutBtn').style.display    = 'none';
+  } else {
+    isViewerMode = false;
+  }
+  // Firebase se inițializează și arată loading overlay până aduce datele
+  window._startFirebase();
+}
+
+function tryLogin() {
+  var pwd = document.getElementById('pwdInput').value;
+  if (pwd === EDITOR_PASSWORD) {
+    saveSession(SESSION_EDITOR); applyRole(SESSION_EDITOR);
+  } else if (pwd === VIEWER_PASSWORD) {
+    saveSession(SESSION_VIEWER); applyRole(SESSION_VIEWER);
+  } else {
+    document.getElementById('loginError').innerText = '❌ Parolă incorectă.';
+    document.getElementById('pwdInput').value = '';
+  }
+}
+
+function doLogout() {
+  clearSession();
+  location.reload();
+}
+
+// La încărcare: dacă există sesiune validă → sare direct peste login
+(function checkSession() {
+  var role = loadSession();
+  if (role === SESSION_EDITOR || role === SESSION_VIEWER) {
+    window.addEventListener('load', function() { applyRole(role); });
+  }
+})();
+
+// ── UNDO ─────────────────────────────────────────────────────────
+var undoStack = [];
+var MAX_UNDO  = 50;
+
+function pushUndo() {
+  if (isViewerMode) return;
+  undoStack.push(JSON.stringify({
+    startJournal  : document.getElementById('startJournal').value,
+    adTime        : document.getElementById('adTime').value,
+    adDuration    : document.getElementById('adDuration').value,
+    plannedPart2  : document.getElementById('plannedPart2').value,
+    jurnalDuration: document.getElementById('jurnalDuration').value,
+    rows          : getRowsData()
+  }));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+function undo() {
+  if (isViewerMode || undoStack.length === 0) return;
+  var state = JSON.parse(undoStack.pop());
+  document.getElementById('startJournal').value   = state.startJournal   || '18:57:00';
+  document.getElementById('adTime').value         = state.adTime         || '19:30:00';
+  document.getElementById('adDuration').value     = state.adDuration     || '05:00';
+  document.getElementById('plannedPart2').value   = state.plannedPart2   || '04:00';
+  document.getElementById('jurnalDuration').value = state.jurnalDuration || '35:00';
+  document.querySelector('#table tbody').innerHTML = '';
+  (state.rows || []).forEach(function(d) { addRow(d.part, d); });
+  update(); saveToCloud();
+}
+
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    e.preventDefault(); undo();
+  }
+});
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function matchesWord(str, word) {
+  var escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(?<![a-zA-ZăâîșțĂÂÎȘȚ])' + escaped + '(?![a-zA-ZăâîșțĂÂÎȘȚ])', 'i').test(str);
+}
+function getDefaultVideo(title) {
+  if (matchesWord(title,'coming up') || matchesWord(title,'c-up')) return 15;
+  if (matchesWord(title,'pa'))        return 25;
+  if (matchesWord(title,'off') && (matchesWord(title,'amb') || matchesWord(title,'ambianta'))) return 45;
+  if (matchesWord(title,'ambianta') || matchesWord(title,'amb')) return 10;
+  if (matchesWord(title,'headuri'))   return 40;
+  if (matchesWord(title,'off'))       return 30;
+  if (matchesWord(title,'sincron'))   return 20;
+  return 120;
+}
+function isZeroCap(title) {
+  var words = ['headuri','off','coming up','c-up','pa','sincron','amb','ambianta'];
+  for (var i=0;i<words.length;i++) if (matchesWord(title,words[i])) return true;
+  return false;
+}
+function isComingUpLine(title) { return matchesWord(title,'coming up') || matchesWord(title,'c-up'); }
+function cleanTitle(t) {
+  t = t.replace(/[#\d$.,;:!?\/\\|@%^&*()\[\]{}_+=~`"']/g, '');
+  t = t.replace(/^\s*[-–—]+\s*/, '').replace(/\s*[-–—]+\s*$/, '');
+  return t.replace(/\s+/g, ' ').trim();
+}
+function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString('ro-RO', {hour12:false}); }
+setInterval(updateClock, 1000); updateClock();
+function fmt(sec) { return String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0'); }
+function fmtClock(d) { return d.toLocaleTimeString('ro-RO', {hour12:false}); }
+function parseSec(t) {
+  t = (t||'').trim().toLowerCase(); if (!t) return 0;
+  if (t.includes(':')) { var p=t.split(':').map(Number); if (p.length===3) return p[0]*3600+p[1]*60+p[2]; return (p[0]||0)*60+(p[1]||0); }
+  var m = t.match(/(?:(\d+)m)?\s*(?:(\d+)s)?/); if (m) return (parseInt(m[1])||0)*60+(parseInt(m[2])||0);
+  return parseInt(t)||0;
+}
+function parseHour(t) { var p=(t||'').split(':').map(Number); var d=new Date(); d.setHours(p[0]||0,p[1]||0,p[2]||0,0); return d; }
+function normalizeInput(inp) { inp.value = fmt(parseSec(inp.value)); update(); }
+
+// ── PASTE ────────────────────────────────────────────────────────
+function handleTitleInput(inp) {
+  if (isViewerMode) return;
+  var row=inp.closest('tr'); var vid=row.cells[2].querySelector('input'); var cap=row.cells[3].querySelector('input'); var t=inp.value;
+  vid.value = fmt(getDefaultVideo(t));
+  if (isZeroCap(t)) cap.value='00:00'; else if (parseSec(cap.value)===0) cap.value='00:20';
+  updateAndSave();
+}
+function handlePaste(e, inp) {
+  if (isViewerMode) { e.preventDefault(); return; }
+  var text=(e.clipboardData||window.clipboardData).getData('text');
+  if (!text.includes('\n')) return;
+  e.preventDefault();
+  var lines=text.split('\n').map(function(l){ return cleanTitle(l.trim()); }).filter(function(l){return l;});
+  var row=inp.closest('tr'); var part=row.dataset.part||'part1';
+  inp.value=lines[0];
+  row.cells[2].querySelector('input').value=fmt(getDefaultVideo(lines[0]));
+  row.cells[3].querySelector('input').value=isZeroCap(lines[0])?'00:00':'00:20';
+  var tbody=document.querySelector('#table tbody'); var sep=tbody.querySelector('.separator');
+  var cur=row; var switchedToPart2=false;
+  for (var i=1;i<lines.length;i++) {
+    if (isComingUpLine(lines[i-1])) switchedToPart2=true;
+    var linePart=(switchedToPart2||part==='part2')?'part2':'part1';
+    if (linePart==='part2' && !sep) { sep=document.createElement('tr'); sep.className='separator'; var td=document.createElement('td'); td.colSpan=8; td.innerText='⬛ PUBLICITATE / PARTEA 2 ⬛'; sep.appendChild(td); tbody.appendChild(sep); }
+    var nr=makeRow(linePart,lines[i],fmt(getDefaultVideo(lines[i])),isZeroCap(lines[i])?'00:00':'00:20','principala');
+    if (linePart==='part1') { var ins=cur.nextElementSibling; if (ins&&ins.classList.contains('separator')) tbody.insertBefore(nr,ins); else if (ins) cur.parentNode.insertBefore(nr,ins); else tbody.appendChild(nr); cur=nr; }
+    else { tbody.appendChild(nr); cur=nr; }
+  }
+  update();
+}
+function handlePasteDurations(e, col) {
+  if (isViewerMode) { e.preventDefault(); return; }
+  var text=(e.clipboardData||window.clipboardData).getData('text');
+  if (!text.includes('\n')) return;
+  e.preventDefault();
+  var lines=text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
+  var rows=Array.from(document.querySelectorAll('#table tbody tr:not(.separator)'));
+  var si=rows.indexOf(e.target.closest('tr'));
+  lines.forEach(function(v,i){ if (rows[si+i]) rows[si+i].cells[col].querySelector('input').value=v; });
+  update();
+}
+
+// ── ROW BUILDER ──────────────────────────────────────────────────
+function makeRow(part, title, video, cap, status) {
+  status=status||'principala';
+  var tr=document.createElement('tr'); tr.dataset.part=part; tr.dataset.status=status;
+  var tdNum=document.createElement('td'); tr.appendChild(tdNum);
+
+  var tdTitle=document.createElement('td'); tdTitle.className='td-title';
+  var btnStatus=document.createElement('button'); btnStatus.className='btn-status '+status;
+  btnStatus.title=status==='principala'?'Principală':'Rezervă';
+  btnStatus.addEventListener('click', function() {
+    if (isViewerMode) return;
+    pushUndo();
+    var row=this.closest('tr');
+    if (row.dataset.status==='principala') { row.dataset.status='rezerva'; this.className='btn-status rezerva'; this.title='Rezervă'; }
+    else { row.dataset.status='principala'; this.className='btn-status principala'; this.title='Principală'; }
+    updateAndSave();
+  });
+  tdTitle.appendChild(btnStatus);
+  var inpTitle=document.createElement('input'); inpTitle.value=title; inpTitle.style.textAlign='left';
+  inpTitle.addEventListener('focus',function(){ pushUndo(); });
+  inpTitle.addEventListener('input',function(){ handleTitleInput(this); });
+  inpTitle.addEventListener('paste',function(e){ handlePaste(e,this); });
+  tdTitle.appendChild(inpTitle); tr.appendChild(tdTitle);
+
+  var tdVid=document.createElement('td'); var inpVid=document.createElement('input'); inpVid.value=video;
+  inpVid.addEventListener('focus',function(){ pushUndo(); });
+  inpVid.addEventListener('blur',function(){ normalizeAndSave(this); });
+  inpVid.addEventListener('input',function(){ updateAndSave(); });
+  inpVid.addEventListener('paste',function(e){ handlePasteDurations(e,2); });
+  inpVid.addEventListener('keydown',function(e){ if(e.key==='Enter') this.blur(); });
+  tdVid.appendChild(inpVid); tr.appendChild(tdVid);
+
+  var tdCap=document.createElement('td'); var inpCap=document.createElement('input'); inpCap.value=cap;
+  inpCap.addEventListener('focus',function(){ pushUndo(); });
+  inpCap.addEventListener('blur',function(){ normalizeAndSave(this); });
+  inpCap.addEventListener('input',function(){ updateAndSave(); });
+  inpCap.addEventListener('paste',function(e){ handlePasteDurations(e,3); });
+  inpCap.addEventListener('keydown',function(e){ if(e.key==='Enter') this.blur(); });
+  tdCap.appendChild(inpCap); tr.appendChild(tdCap);
+
+  var tdTotal=document.createElement('td'); tdTotal.className='total'; tdTotal.innerText='00:00'; tr.appendChild(tdTotal);
+  var tdStart=document.createElement('td'); tdStart.className='start'; tdStart.innerText='00:00'; tr.appendChild(tdStart);
+  var tdEnd=document.createElement('td');   tdEnd.className='end';     tdEnd.innerText='00:00:00'; tr.appendChild(tdEnd);
+
+  var tdAct=document.createElement('td');
+  var btnUp=document.createElement('button'); btnUp.innerText='⬆'; btnUp.onclick=function(){ if(!isViewerMode){ moveUp(this); } };
+  var btnDown=document.createElement('button'); btnDown.innerText='⬇'; btnDown.onclick=function(){ if(!isViewerMode){ moveDown(this); } };
+  var btnDel=document.createElement('button'); btnDel.innerText='❌'; btnDel.onclick=function(){ if(!isViewerMode){ deleteRow(this); } };
+  var btnFin=document.createElement('button'); btnFin.innerText='✓ Finish'; btnFin.className='btn-finish'; btnFin.onclick=function(){ if(!isViewerMode){ toggleFinish(this); } };
+  tdAct.appendChild(btnUp); tdAct.appendChild(btnDown); tdAct.appendChild(btnDel); tdAct.appendChild(btnFin);
+  tr.appendChild(tdAct);
+  return tr;
+}
+
+function addRowWithUndo(part) { if(isViewerMode) return; pushUndo(); addRow(part); }
+
+window.addRow = function addRow(part, data) {
+  part=part||'part1'; data=data||{};
+  var title=data.title||'';
+  var video=data.video!==undefined?data.video:fmt(getDefaultVideo(title));
+  var cap=data.cap!==undefined?data.cap:(isZeroCap(title)?'00:00':'00:20');
+  var tbody=document.querySelector('#table tbody'); var sep=tbody.querySelector('.separator');
+  if (part==='part2' && !sep) {
+    var s=document.createElement('tr'); s.className='separator';
+    var td=document.createElement('td'); td.colSpan=8; td.innerText='⬛ PUBLICITATE / PARTEA 2 ⬛';
+    s.appendChild(td); tbody.appendChild(s); sep=s;
+  }
+  var row=makeRow(part,title,video,cap,data.status||'principala');
+  if (data.finished) row.classList.add('finished');
+  if (part==='part1') { if (sep) tbody.insertBefore(row,sep); else tbody.appendChild(row); }
+  else tbody.appendChild(row);
+  updateAndSave();
+};
+
+// ── SCOASE ───────────────────────────────────────────────────────
+var scoaseList=[];
+var scoaseVisible=true;
+
+function toggleScoase() {
+  scoaseVisible=!scoaseVisible;
+  document.getElementById('scoaseBody').style.display=scoaseVisible?'':'none';
+  document.getElementById('scoaseToggleIcon').innerText=scoaseVisible?'▼':'▶';
+}
+function updateScoaseBadge() {
+  var badge=document.getElementById('scoaseBadge'); var empty=document.getElementById('scoaseEmpty');
+  badge.innerText=scoaseList.length; badge.style.display=scoaseList.length>0?'inline-block':'none';
+  empty.style.display=scoaseList.length===0?'block':'none';
+}
+window.renderScoase = function() {
+  var body=document.getElementById('scoaseBody');
+  Array.from(body.querySelectorAll('.scoasa-row')).forEach(function(el){ el.remove(); });
+  scoaseList.forEach(function(item,idx) {
+    var div=document.createElement('div'); div.className='scoasa-row';
+    var badge=document.createElement('span'); badge.className='scoasa-part-badge'; badge.innerText=item.part==='part1'?'P1':'P2'; div.appendChild(badge);
+    var titleEl=document.createElement('span'); titleEl.className='scoasa-title'; titleEl.innerText=item.title||'(fără titlu)'; div.appendChild(titleEl);
+    var durate=document.createElement('span'); durate.className='scoasa-durate'; durate.innerText='V:'+item.video+'  C:'+item.cap; div.appendChild(durate);
+    if (!isViewerMode) {
+      var btnRepune=document.createElement('button'); btnRepune.className='btn-repune'; btnRepune.innerText='↩ Repune';
+      (function(i){ btnRepune.onclick=function(){ repuneRow(i); }; })(idx);
+      div.appendChild(btnRepune);
+    }
+    body.appendChild(div);
+  });
+  updateScoaseBadge();
+};
+
+function repuneRow(idx) {
+  pushUndo();
+  var item=scoaseList.splice(idx,1)[0];
+  var tbody=document.querySelector('#table tbody');
+  var newRow=makeRow(item.part,item.title,item.video!==undefined?item.video:fmt(getDefaultVideo(item.title)),item.cap!==undefined?item.cap:(isZeroCap(item.title)?'00:00':'00:20'),item.status||'principala');
+  if (item.finished) newRow.classList.add('finished');
+  if (item.nextSibling && item.nextSibling.parentNode===tbody) tbody.insertBefore(newRow,item.nextSibling);
+  else tbody.appendChild(newRow);
+  renderScoase(); updateAndSave();
+}
+function deleteRow(btn) {
+  if (isViewerMode) return;
+  pushUndo();
+  var row=btn.closest('tr'); var inputs=row.querySelectorAll('input');
+  var title=inputs[0]?inputs[0].value:''; var video=inputs[1]?inputs[1].value:'00:00'; var cap=inputs[2]?inputs[2].value:'00:00';
+  scoaseList.push({ title:title, video:video, cap:cap, part:row.dataset.part||'part1', finished:row.classList.contains('finished'), status:row.dataset.status||'principala', nextSibling:row.nextElementSibling||null });
+  renderScoase(); row.remove(); updateAndSave();
+}
+function toggleFinish(btn) { if(isViewerMode) return; pushUndo(); btn.closest('tr').classList.toggle('finished'); updateAndSave(); }
+function moveUp(btn) { if(isViewerMode) return; pushUndo(); var row=btn.closest('tr'); var prev=row.previousElementSibling; if(prev&&!prev.classList.contains('separator')) row.parentNode.insertBefore(row,prev); updateAndSave(); }
+function moveDown(btn) { if(isViewerMode) return; pushUndo(); var row=btn.closest('tr'); var next=row.nextElementSibling; if(next) row.parentNode.insertBefore(next,row); updateAndSave(); }
+
+// ── UPDATE ───────────────────────────────────────────────────────
+window.update = function() {
+  var rows=document.querySelectorAll('#table tbody tr');
+  var startJ=parseHour(document.getElementById('startJournal').value);
+  var adTime=parseHour(document.getElementById('adTime').value);
+  var adDur=parseSec(document.getElementById('adDuration').value);
+  var planned2=parseSec(document.getElementById('plannedPart2').value);
+  var totVid=0,totCap=0,startSec=0,p1v=0,p1c=0,p2v=0,p2c=0,p2act=0,idx=1,sep=false;
+  var adTimeSec=(adTime-startJ)/1000;
+  var bestRow=null,bestDiff=Infinity,runSec=0;
+  rows.forEach(function(row) {
+    if (row.classList.contains('separator')) { runSec+=adDur; return; }
+    if (row.dataset.part==='part2') return;
+    var vid=parseSec(row.cells[2].querySelector('input').value)||0;
+    var cap=parseSec(row.cells[3].querySelector('input').value)||0;
+    var endSec=runSec+vid+cap; var diff=Math.abs(endSec-adTimeSec);
+    if (diff<bestDiff) { bestDiff=diff; bestRow=row; }
+    runSec+=vid+cap;
+  });
+  rows.forEach(function(row) {
+    if (row.classList.contains('separator')) { startSec+=adDur; sep=true; return; }
+    row.cells[0].innerText=idx++;
+    var title=row.cells[1].querySelector('input').value;
+    var vid=parseSec(row.cells[2].querySelector('input').value)||0;
+    var cap=parseSec(row.cells[3].querySelector('input').value)||0;
+    var total=vid+cap;
+    if (title.toLowerCase().includes('coming up')||matchesWord(title,'c-up')||matchesWord(title,'pa')) row.classList.add('highlight-yellow'); else row.classList.remove('highlight-yellow');
+    if (row===bestRow&&!row.classList.contains('highlight-yellow')) row.classList.add('highlight-ad-closest'); else row.classList.remove('highlight-ad-closest');
+    if (!sep) { p1v+=vid; p1c+=cap; } else { p2v+=vid; p2c+=cap; p2act+=total; }
+    row.querySelector('.total').innerText=fmt(total);
+    row.querySelector('.start').innerText=fmt(startSec);
+    row.querySelector('.end').innerText=fmtClock(new Date(startJ.getTime()+(startSec+total)*1000));
+    startSec+=total; totVid+=vid; totCap+=cap;
+  });
+  document.getElementById('totalVideo').innerText=fmt(totVid);
+  document.getElementById('totalCap').innerText=fmt(totCap);
+  document.getElementById('totalAll').innerText=fmt(totVid+totCap);
+  document.getElementById('part1Totals').innerText='Partea 1 - Video: '+fmt(p1v)+', Cap: '+fmt(p1c)+', Total: '+fmt(p1v+p1c);
+  document.getElementById('part2Totals').innerText='Partea 2 - Video: '+fmt(p2v)+', Cap: '+fmt(p2c)+', Total: '+fmt(p2v+p2c);
+  var tl1=(adTime-startJ)/1000-(p1v+p1c);
+  document.getElementById('timeLeftPart1').innerText=tl1>0?'⏱ Partea 1: Mai ai nevoie de '+fmt(tl1):tl1<0?'⚠️ Partea 1: Ai depășit cu '+fmt(Math.abs(tl1)):'✅ Partea 1: Exact la timp';
+  document.getElementById('timeLeftPart2').innerText=p2act<planned2?'⏱ Partea 2: Mai ai nevoie de '+fmt(planned2-p2act):p2act>planned2?'⚠️ Partea 2: Ai depășit cu '+fmt(p2act-planned2):'✅ Partea 2: Exact la timp';
+};
+
+// ── SAVE / LOAD ──────────────────────────────────────────────────
+function getRowsData() {
+  var rows=document.querySelectorAll('#table tbody tr:not(.separator)'); var data=[];
+  rows.forEach(function(row) {
+    data.push({ title:row.cells[1].querySelector('input').value, video:row.cells[2].querySelector('input').value, cap:row.cells[3].querySelector('input').value, part:row.dataset.part, status:row.dataset.status||'principala', finished:row.classList.contains('finished') });
+  });
+  return data;
+}
+function getCurrentState() {
+  return {
+    startJournal  : document.getElementById('startJournal').value,
+    adTime        : document.getElementById('adTime').value,
+    adDuration    : document.getElementById('adDuration').value,
+    plannedPart2  : document.getElementById('plannedPart2').value,
+    jurnalDuration: document.getElementById('jurnalDuration').value,
+    observatii    : document.getElementById('observatiiText').value,
+    rows          : getRowsData(),
+    scoase        : scoaseList
+  };
+}
+function saveToCloud() {
+  if (isViewerMode) return;
+  if (window._fbSave) window._fbSave(getCurrentState());
+}
+function saveData() {
+  var today=new Date(); var yyyy=today.getFullYear(); var mm=String(today.getMonth()+1).padStart(2,'0'); var dd=String(today.getDate()).padStart(2,'0');
+  var blob=new Blob([JSON.stringify(getCurrentState(),null,2)],{type:'application/json'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rundown_'+yyyy+'-'+mm+'-'+dd+'.json'; a.click(); URL.revokeObjectURL(a.href);
+}
+function importData() { document.getElementById('fileInput').click(); }
+function handleImport(event) {
+  var file=event.target.files[0]; if (!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e) {
+    var obj=JSON.parse(e.target.result);
+    document.getElementById('startJournal').value  =obj.startJournal  ||'18:57:00';
+    document.getElementById('adTime').value        =obj.adTime        ||'19:30:00';
+    document.getElementById('adDuration').value    =obj.adDuration    ||'05:00';
+    document.getElementById('plannedPart2').value  =obj.plannedPart2  ||'04:00';
+    document.getElementById('jurnalDuration').value=obj.jurnalDuration||'35:00';
+    document.getElementById('observatiiText').value=obj.observatii    ||'';
+    document.querySelector('#table tbody').innerHTML='';
+    obj.rows.forEach(function(d){ addRow(d.part,d); });
+    updateAndSave();
+  };
+  reader.readAsText(file);
+}
+function updateAndSave()       { update(); saveToCloud(); }
+function normalizeAndSave(inp) { normalizeInput(inp); saveToCloud(); }
+
+function resetPage() {
+  if (isViewerMode) return;
+  if (confirm('Sigur vrei să resetezi pagina și să ștergi toate datele?')) {
+    if (window._fbSave) window._fbSave(null);
+    document.querySelector('#table tbody').innerHTML=''; scoaseList=[]; renderScoase();
+    document.getElementById('startJournal').value='18:57:00';
+    document.getElementById('adTime').value='19:30:00';
+    document.getElementById('adDuration').value='05:00';
+    document.getElementById('plannedPart2').value='04:00';
+    document.getElementById('jurnalDuration').value='35:00';
+    document.getElementById('observatiiText').value='';
+    update();
+  }
+}
+
+function closeJurnal() {
+  if (isViewerMode) return;
+  if (!confirm('Închizi jurnalul de azi?\n\nSe va descărca JSON-ul automat și Firebase se va reseta pentru jurnalul de mâine.')) return;
+  // 1. Descarcă JSON
+  saveData();
+  // 2. Șterge din Firebase și resetează interfața
+  setTimeout(function() {
+    if (window._fbSave) window._fbSave(null);
+    document.querySelector('#table tbody').innerHTML=''; scoaseList=[]; renderScoase();
+    document.getElementById('startJournal').value='18:57:00';
+    document.getElementById('adTime').value='19:30:00';
+    document.getElementById('adDuration').value='05:00';
+    document.getElementById('plannedPart2').value='04:00';
+    document.getElementById('jurnalDuration').value='35:00';
+    document.getElementById('observatiiText').value='';
+    update();
+  }, 400);
+}
+
+// ── TIMERE ───────────────────────────────────────────────────────
+var t1,t2,s1=0,s2=0;
+function startTimer1(){ if(t1) return; t1=setInterval(function(){ s1++; document.getElementById('timer1').innerText=fmt(s1); },1000); }
+function stopTimer1() { clearInterval(t1); t1=null; }
+function resetTimer1(){ stopTimer1(); s1=0; document.getElementById('timer1').innerText='00:00'; }
+function startTimer2(){ if(t2) return; t2=setInterval(function(){ s2++; document.getElementById('timer2').innerText=fmt(s2); },1000); }
+function stopTimer2() { clearInterval(t2); t2=null; }
+function resetTimer2(){ stopTimer2(); s2=0; document.getElementById('timer2').innerText='00:00'; }
+
+// ── COUNTDOWN ────────────────────────────────────────────────────
+var cdPaused=false;
+function cdTogglePause() {
+  cdPaused=!cdPaused;
+  document.querySelector('#countdownWidget .cd-controls button:last-child').innerText=cdPaused?'▶ Reia':'⏸ Pauză';
+}
+function updateCountdown() {
+  if (cdPaused) return;
+  var adVal=document.getElementById('adTime').value;
+  var display=document.getElementById('countdownDisplay');
+  var sublabel=document.getElementById('cdPauseInfo');
+  if (!adVal) { display.innerText='--:--'; return; }
+  var parts=adVal.split(':').map(Number); var now=new Date(); var pause=new Date();
+  pause.setHours(parts[0]||0,parts[1]||0,parts[2]||0,0);
+  var diff=Math.round((pause-now)/1000);
+  sublabel.innerText='pauză la '+adVal.substring(0,5);
+  if (diff>0) {
+    var h=Math.floor(diff/3600),m=Math.floor((diff%3600)/60),s=diff%60;
+    display.innerText=h>0?String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'):String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    display.className=diff>300?'cd-ok':diff>60?'cd-warn':'cd-danger';
+  } else {
+    var over=Math.abs(diff),m2=Math.floor(over/60),s2b=over%60;
+    display.innerText='+'+String(m2).padStart(2,'0')+':'+String(s2b).padStart(2,'0');
+    display.className='cd-over';
+    sublabel.innerText='⚠️ Pauza a depășit cu '+String(m2).padStart(2,'0')+':'+String(s2b).padStart(2,'0');
+  }
+}
+setInterval(updateCountdown,1000); updateCountdown();
+
+// ── OBSERVAȚII ───────────────────────────────────────────────────
+var observatiiVisible=true;
+function toggleObservatii() {
+  observatiiVisible=!observatiiVisible;
+  document.getElementById('observatiiBody').style.display=observatiiVisible?'':'none';
+  document.getElementById('observatiiToggleIcon').innerText=observatiiVisible?'▼':'▶';
+}
+document.getElementById('observatiiText').addEventListener('input', function(){ if(!isViewerMode) saveToCloud(); });
+
+update();
+</script>
+</body>
+</html>
