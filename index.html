@@ -259,7 +259,11 @@
   #observatiiText::placeholder { color: #2a5a8a; font-style: italic; }
   #observatiiText:focus { border-color: #3a7add; box-shadow: 0 0 8px #1464c840; background: rgba(8,22,55,0.95); }
 
-  /* Viewer mode — blochează orice modificare și ascunde elementele de editare */
+  /* ══════════════════════════════════════════════
+     VIEWER MODE
+     - ascunde elementele de editare
+     - păstrează vizibil Start jurnal + Ora publicitate (read-only)
+  ══════════════════════════════════════════════ */
   body.viewer-mode input { pointer-events: none; }
   body.viewer-mode td button { display: none; }
   body.viewer-mode .add-buttons { display: none !important; }
@@ -267,9 +271,33 @@
   body.viewer-mode #observatiiText { pointer-events: none; }
   body.viewer-mode #viewerBanner { display: none !important; }
   body.viewer-mode #timerSection { display: none !important; }
+  body.viewer-mode #logoutBtn { display: none !important; }
+
+  /* Ascunde settings complet în viewer, dar afișează panoul de info viewer */
   body.viewer-mode .settings { display: none !important; }
   body.viewer-mode .clock-row label { display: none !important; }
-  body.viewer-mode #logoutBtn { display: none !important; }
+
+  /* Panoul viewer cu Start jurnal + Ora publicitate — doar citire */
+  #viewerInfoBar {
+    display: none;
+    flex-wrap: wrap; align-items: center; gap: 16px;
+    margin-bottom: 10px; background: rgba(10,40,90,0.55);
+    border: 1px solid #1a4a8a; border-radius: 6px; padding: 8px 14px;
+  }
+  body.viewer-mode #viewerInfoBar { display: flex; }
+
+  #viewerInfoBar .vi-label {
+    font-size: 13px; color: #7ec8ff; font-weight: 600; letter-spacing: 0.5px;
+  }
+  #viewerInfoBar .vi-value {
+    font-size: 15px; font-weight: 900; color: #ffffff;
+    background: rgba(5,15,40,0.7); border: 1px solid #2a5a9a;
+    border-radius: 4px; padding: 3px 12px; letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  #viewerInfoBar .vi-sep {
+    width: 1px; height: 28px; background: #1a4a8a; flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -318,7 +346,18 @@
 </div>
 
 <!-- ══════════════════════════════════════════════
-     SETTINGS BAR
+     PANOU INFO VIEWER (doar citire — vizibil doar în viewer mode)
+══════════════════════════════════════════════ -->
+<div id="viewerInfoBar">
+  <span class="vi-label">🕐 Start jurnal</span>
+  <span class="vi-value" id="viStartJournal">—</span>
+  <span class="vi-sep"></span>
+  <span class="vi-label">📢 Ora publicitate</span>
+  <span class="vi-value" id="viAdTime">—</span>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SETTINGS BAR (vizibil doar pentru editor)
 ══════════════════════════════════════════════ -->
 <div class="settings">
   <label>Start jurnal: <input id="startJournal" placeholder="HH:MM:SS" value="18:57:00" onfocus="pushUndo()" onblur="updateAndSave()" onkeydown="if(event.key==='Enter')this.blur()"></label>
@@ -415,11 +454,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  🔧 CONFIGURARE FIREBASE                                        ║
-// ║  Înlocuiește valorile de mai jos cu cele din Firebase Console:  ║
-// ║  console.firebase.google.com → Project Settings → Web app      ║
-// ╚══════════════════════════════════════════════════════════════════╝
 const firebaseConfig = {
   apiKey: "AIzaSyCeFIhxZvOTJ3ZxcB9O1fGvMbNcP_-u_C4",
   authDomain: "kanal-d-rundown.firebaseapp.com",
@@ -428,11 +462,7 @@ const firebaseConfig = {
   storageBucket: "kanal-d-rundown.firebasestorage.app",
   messagingSenderId: "185102941688",
   appId: "1:185102941688:web:72d2651507669f9c0e2a0d"
-
 };
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  Sfârșit configurare Firebase                                   ║
-// ╚══════════════════════════════════════════════════════════════════╝
 
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
@@ -486,6 +516,10 @@ function loadRemoteData(obj) {
   document.getElementById('plannedPart2').value   = obj.plannedPart2   || '04:00';
   document.getElementById('jurnalDuration').value = obj.jurnalDuration || '35:00';
   document.getElementById('observatiiText').value = obj.observatii     || '';
+
+  // Actualizează și panoul viewer de fiecare dată când vin date noi
+  window.updateViewerInfoBar();
+
   document.querySelector('#table tbody').innerHTML = '';
   (obj.rows || []).forEach(function(d) { window.addRow(d.part, d); });
   window.scoaseList = obj.scoase || [];
@@ -500,26 +534,14 @@ function loadRemoteData(obj) {
 ══════════════════════════════════════════════ -->
 <script>
 
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  🔐 PAROLE — schimbă-le înainte să publici!                    ║
-// ║  EDITOR_PASSWORD = acces complet (poate edita tot)             ║
-// ║  VIEWER_PASSWORD = doar vizualizare (nu poate modifica nimic)  ║
-// ╚══════════════════════════════════════════════════════════════════╝
-var EDITOR_PASSWORD = "ProdRegie2026";
-var VIEWER_PASSWORD = "VizRedactie2026";
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  Sfârșit configurare parole                                     ║
-// ╚══════════════════════════════════════════════════════════════════╝
+var EDITOR_PASSWORD = "Prod regie2026";
+var VIEWER_PASSWORD = "Viz redactie2026";
 
 var SESSION_KEY    = 'kd_rundown_session';
 var SESSION_EDITOR = 'editor';
 var SESSION_VIEWER = 'viewer';
 var isViewerMode   = false;
 
-// ── SESIUNE ──────────────────────────────────────────────────────
-// sessionStorage: rămâne cât timp tab-ul e deschis.
-// La refresh → sesiunea există → sare direct peste login → datele vin din Firebase.
-// La închiderea tab-ului sau la apăsarea "Ieșire" → sesiunea se șterge.
 function saveSession(role) { try { sessionStorage.setItem(SESSION_KEY, role); } catch(e){} }
 function loadSession()     { try { return sessionStorage.getItem(SESSION_KEY); } catch(e){ return null; } }
 function clearSession()    { try { sessionStorage.removeItem(SESSION_KEY); } catch(e){} }
@@ -534,7 +556,6 @@ function applyRole(role) {
   } else {
     isViewerMode = false;
   }
-  // Firebase se inițializează și arată loading overlay până aduce datele
   window._startFirebase();
 }
 
@@ -555,13 +576,23 @@ function doLogout() {
   location.reload();
 }
 
-// La încărcare: dacă există sesiune validă → sare direct peste login
 (function checkSession() {
   var role = loadSession();
   if (role === SESSION_EDITOR || role === SESSION_VIEWER) {
     window.addEventListener('load', function() { applyRole(role); });
   }
 })();
+
+// ── VIEWER INFO BAR ───────────────────────────────────────────────
+// Sincronizează valorile din câmpurile ascunse în panoul viewer (read-only)
+window.updateViewerInfoBar = function() {
+  var sj  = document.getElementById('startJournal').value  || '—';
+  var adt = document.getElementById('adTime').value        || '—';
+  var viSJ  = document.getElementById('viStartJournal');
+  var viADT = document.getElementById('viAdTime');
+  if (viSJ)  viSJ.innerText  = sj;
+  if (viADT) viADT.innerText = adt;
+};
 
 // ── UNDO ─────────────────────────────────────────────────────────
 var undoStack = [];
@@ -851,6 +882,9 @@ window.update = function() {
   var tl1=(adTime-startJ)/1000-(p1v+p1c);
   document.getElementById('timeLeftPart1').innerText=tl1>0?'⏱ Partea 1: Mai ai nevoie de '+fmt(tl1):tl1<0?'⚠️ Partea 1: Ai depășit cu '+fmt(Math.abs(tl1)):'✅ Partea 1: Exact la timp';
   document.getElementById('timeLeftPart2').innerText=p2act<planned2?'⏱ Partea 2: Mai ai nevoie de '+fmt(planned2-p2act):p2act>planned2?'⚠️ Partea 2: Ai depășit cu '+fmt(p2act-planned2):'✅ Partea 2: Exact la timp';
+
+  // Actualizează panoul viewer la orice update
+  window.updateViewerInfoBar();
 };
 
 // ── SAVE / LOAD ──────────────────────────────────────────────────
@@ -899,8 +933,6 @@ function handleImport(event) {
 function updateAndSave()       { update(); saveToCloud(); }
 function normalizeAndSave(inp) { normalizeInput(inp); saveToCloud(); }
 
-// Debounce: salvează în Firebase după 800ms de inactivitate
-// Rezolvă problema sincronizării când se adaugă mai multe știri rapid
 var _saveTimer = null;
 function saveToCloud() {
   if (isViewerMode) return;
@@ -927,9 +959,7 @@ function resetPage() {
 function closeJurnal() {
   if (isViewerMode) return;
   if (!confirm('Închizi jurnalul de azi?\n\nSe va descărca JSON-ul automat și Firebase se va reseta pentru jurnalul de mâine.')) return;
-  // 1. Descarcă JSON
   saveData();
-  // 2. Anulează orice save pending și șterge din Firebase imediat
   if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
   setTimeout(function() {
     if (window._fbSave) window._fbSave(null);
