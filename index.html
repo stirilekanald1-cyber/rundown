@@ -265,7 +265,9 @@
      - păstrează vizibil Start jurnal + Ora publicitate (read-only)
   ══════════════════════════════════════════════ */
   body.viewer-mode input { pointer-events: none; }
-  body.viewer-mode td button { display: none; }
+  body.viewer-mode td button:not(.btn-status) { display: none; }
+  body.viewer-mode .btn-status { pointer-events: none !important; cursor: default !important; }
+  body.viewer-mode .btn-status:hover { filter: none !important; }
   body.viewer-mode .add-buttons { display: none !important; }
   body.viewer-mode #editorControls { display: none !important; }
   body.viewer-mode #observatiiText { pointer-events: none; }
@@ -298,9 +300,57 @@
   #viewerInfoBar .vi-sep {
     width: 1px; height: 28px; background: #1a4a8a; flex-shrink: 0;
   }
+
+  /* ══════════════════════════════════════════════
+     ALERT OVERLAY (flash roșu)
+  ══════════════════════════════════════════════ */
+  #alertOverlay {
+    position: fixed; inset: 0;
+    background: rgba(200, 0, 0, 0.52);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 9989;
+    transition: opacity 2s ease-out;
+  }
+
+  /* ══════════════════════════════════════════════
+     BUTON ATENȚIE
+  ══════════════════════════════════════════════ */
+  .atentie-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  #atentieBtn {
+    background: linear-gradient(135deg, #8a1414 0%, #4a0a0a 100%);
+    border: 2px solid #cc2222 !important;
+    color: #ffaaaa !important;
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    padding: 14px 24px !important;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    box-shadow: 0 0 14px #cc222240;
+    transition: all 0.15s;
+    line-height: 1.2;
+    text-align: center;
+  }
+  #atentieBtn:hover {
+    background: linear-gradient(135deg, #cc2222 0%, #8a1414 100%) !important;
+    box-shadow: 0 0 24px #cc222280 !important;
+    color: #fff !important;
+    filter: brightness(1.15);
+  }
+  body.viewer-mode .atentie-wrapper { display: none !important; }
 </style>
 </head>
 <body>
+
+<!-- Alert overlay (flash roșu) -->
+<div id="alertOverlay"></div>
 
 <!-- ══════════════════════════════════════════════
      LOGIN OVERLAY
@@ -397,6 +447,9 @@
     <p>Total jurnal: <span id="totalAll">00:00</span></p>
     <p id="timeLeftPart1"></p>
     <p id="timeLeftPart2"></p>
+  </div>
+  <div class="atentie-wrapper">
+    <button id="atentieBtn" onclick="pressAtentie()">⚠️ ATENȚIE</button>
   </div>
   <div id="countdownWidget">
     <div class="cd-label">⏳ PÂNĂ LA PAUZĂ</div>
@@ -525,6 +578,16 @@ function loadRemoteData(obj) {
   window.scoaseList = obj.scoase || [];
   window.renderScoase();
   window.update();
+
+  // ── Alert Atenție — trigger flash pe viewer când editorul apasă butonul ──
+  var newAlertAt = obj.alertAt || 0;
+  if (window._lastAlertAt === undefined) {
+    // Prima încărcare — înregistrăm valoarea fără a declanșa animația
+    window._lastAlertAt = newAlertAt;
+  } else if (newAlertAt && newAlertAt !== window._lastAlertAt) {
+    window._lastAlertAt = newAlertAt;
+    if (window.triggerAlert) window.triggerAlert();
+  }
 }
 </script>
 
@@ -534,8 +597,8 @@ function loadRemoteData(obj) {
 ══════════════════════════════════════════════ -->
 <script>
 
-var EDITOR_PASSWORD = "ProdRegie2026";
-var VIEWER_PASSWORD = "VizRedactie2026";
+var EDITOR_PASSWORD = "Prod regie2026";
+var VIEWER_PASSWORD = "Viz redactie2026";
 
 var SESSION_KEY    = 'kd_rundown_session';
 var SESSION_EDITOR = 'editor';
@@ -694,7 +757,7 @@ function handlePaste(e, inp) {
     if (isComingUpLine(lines[i-1])) switchedToPart2=true;
     var linePart=(switchedToPart2||part==='part2')?'part2':'part1';
     if (linePart==='part2' && !sep) { sep=document.createElement('tr'); sep.className='separator'; var td=document.createElement('td'); td.colSpan=8; td.innerText='⬛ PUBLICITATE / PARTEA 2 ⬛'; sep.appendChild(td); tbody.appendChild(sep); }
-    var nr=makeRow(linePart,lines[i],fmt(getDefaultVideo(lines[i])),isZeroCap(lines[i])?'00:00':'00:20','principala');
+    var nr=makeRow(linePart,lines[i],fmt(getDefaultVideo(lines[i])),isZeroCap(lines[i])?'00:00':'00:20','rezerva');
     if (linePart==='part1') { var ins=cur.nextElementSibling; if (ins&&ins.classList.contains('separator')) tbody.insertBefore(nr,ins); else if (ins) cur.parentNode.insertBefore(nr,ins); else tbody.appendChild(nr); cur=nr; }
     else { tbody.appendChild(nr); cur=nr; }
   }
@@ -779,7 +842,7 @@ window.addRow = function addRow(part, data) {
     var td=document.createElement('td'); td.colSpan=8; td.innerText='⬛ PUBLICITATE / PARTEA 2 ⬛';
     s.appendChild(td); tbody.appendChild(s); sep=s;
   }
-  var row=makeRow(part,title,video,cap,data.status||'principala');
+  var row=makeRow(part,title,video,cap,data.status||'rezerva');
   if (data.finished) row.classList.add('finished');
   if (part==='part1') { if (sep) tbody.insertBefore(row,sep); else tbody.appendChild(row); }
   else tbody.appendChild(row);
@@ -822,7 +885,7 @@ function repuneRow(idx) {
   pushUndo();
   var item=scoaseList.splice(idx,1)[0];
   var tbody=document.querySelector('#table tbody');
-  var newRow=makeRow(item.part,item.title,item.video!==undefined?item.video:fmt(getDefaultVideo(item.title)),item.cap!==undefined?item.cap:(isZeroCap(item.title)?'00:00':'00:20'),item.status||'principala');
+  var newRow=makeRow(item.part,item.title,item.video!==undefined?item.video:fmt(getDefaultVideo(item.title)),item.cap!==undefined?item.cap:(isZeroCap(item.title)?'00:00':'00:20'),item.status||'rezerva');
   if (item.finished) newRow.classList.add('finished');
   if (item.nextSibling && item.nextSibling.parentNode===tbody) tbody.insertBefore(newRow,item.nextSibling);
   else tbody.appendChild(newRow);
@@ -904,7 +967,8 @@ function getCurrentState() {
     jurnalDuration: document.getElementById('jurnalDuration').value,
     observatii    : document.getElementById('observatiiText').value,
     rows          : getRowsData(),
-    scoase        : scoaseList
+    scoase        : scoaseList,
+    alertAt       : window._alertTimestamp || 0
   };
 }
 function saveData() {
@@ -1020,6 +1084,28 @@ function toggleObservatii() {
   document.getElementById('observatiiToggleIcon').innerText=observatiiVisible?'▼':'▶';
 }
 document.getElementById('observatiiText').addEventListener('input', function(){ if(!isViewerMode) saveToCloud(); });
+
+// ── ALERT / ATENȚIE ──────────────────────────────────────────────
+window._alertTimestamp = 0;
+window._lastAlertAt    = undefined; // undefined = neiniţializat încă din Firebase
+
+window.triggerAlert = function() {
+  var overlay = document.getElementById('alertOverlay');
+  if (!overlay) return;
+  overlay.style.transition = 'none';
+  overlay.style.opacity    = '1';
+  void overlay.offsetHeight; // force reflow
+  overlay.style.transition = 'opacity 2s ease-out';
+  overlay.style.opacity    = '0';
+};
+
+function pressAtentie() {
+  if (isViewerMode) return;
+  window._alertTimestamp = Date.now();
+  window.triggerAlert();
+  // Salvare imediată (bypass debounce) ca viewer-ul să primească alert-ul rapid
+  if (window._fbSave) window._fbSave(getCurrentState());
+}
 
 update();
 </script>
