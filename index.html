@@ -517,9 +517,13 @@ const firebaseConfig = {
   appId: "1:185102941688:web:72d2651507669f9c0e2a0d"
 };
 
+// ══ SECRET TOKEN — același cu cel din Firebase Rules ══
+const WRITE_TOKEN = "kd2026xR7mQ9";
+
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
-const rundownRef = ref(db, 'rundown/data');
+const rundownRef  = ref(db, 'rundown/data');
+const tokenRef    = ref(db, 'rundown/token');
 
 let ignoreNextRemote = false;
 
@@ -529,6 +533,8 @@ window._fbSave = function(data) {
   set(rundownRef, data)
     .then(() => { setSyncStatus('synced'); })
     .catch(() => { setSyncStatus('error'); });
+  // Scrie token-ul separat (folosit de Firebase Rules pentru validare scriere)
+  set(tokenRef, WRITE_TOKEN).catch(() => {});
 };
 
 window._fbListen = function() {
