@@ -871,8 +871,15 @@ function handlePaste(e, inp) {
     var linePart=(switchedToPart2||part==='part2')?'part2':'part1';
     if (linePart==='part2' && !sep) { sep=document.createElement('tr'); sep.className='separator'; var td=document.createElement('td'); td.colSpan=8; td.innerText='⬛ PUBLICITATE / PARTEA 2 ⬛'; sep.appendChild(td); tbody.appendChild(sep); }
     var nr=makeRow(linePart,lines[i],fmt(getDefaultVideo(lines[i])),isZeroCap(lines[i])?'00:00':'00:20','rezerva');
-    if (linePart==='part1') { var ins=cur.nextElementSibling; if (ins&&ins.classList.contains('separator')) tbody.insertBefore(nr,ins); else if (ins) cur.parentNode.insertBefore(nr,ins); else tbody.appendChild(nr); cur=nr; }
-    else { tbody.appendChild(nr); cur=nr; }
+    if (linePart==='part1') {
+      // Sărim peste ancorele de timp când căutăm poziția de inserare
+      var ins=cur.nextElementSibling;
+      while (ins && ins.classList.contains('clock-anchor')) ins=ins.nextElementSibling;
+      if (ins&&ins.classList.contains('separator')) tbody.insertBefore(nr,ins);
+      else if (ins) tbody.insertBefore(nr,ins);
+      else tbody.appendChild(nr);
+      cur=nr;
+    } else { tbody.appendChild(nr); cur=nr; }
   }
   update();
 }
@@ -882,9 +889,10 @@ function handlePasteDurations(e, col) {
   if (!text.includes('\n')) return;
   e.preventDefault();
   var lines=text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
-  var rows=Array.from(document.querySelectorAll('#table tbody tr:not(.separator)'));
+  // Excludem ancorele de timp — altfel indexul se decalează și duratele ajung pe rânduri greșite
+  var rows=Array.from(document.querySelectorAll('#table tbody tr:not(.separator):not(.clock-anchor)'));
   var si=rows.indexOf(e.target.closest('tr'));
-  lines.forEach(function(v,i){ if (rows[si+i]) rows[si+i].cells[col].querySelector('input').value=v; });
+  lines.forEach(function(v,i){ if (rows[si+i]) rows[si+i].cells[col].querySelector('input').value=fmt(parseSec(v)); });
   update();
 }
 
@@ -1000,24 +1008,57 @@ function repuneRow(idx) {
   var tbody=document.querySelector('#table tbody');
   var newRow=makeRow(item.part,item.title,item.video!==undefined?item.video:fmt(getDefaultVideo(item.title)),item.cap!==undefined?item.cap:(isZeroCap(item.title)?'00:00':'00:20'),item.status||'rezerva');
   if (item.finished) newRow.classList.add('finished');
-  if (item.nextSibling && item.nextSibling.parentNode===tbody) tbody.insertBefore(newRow,item.nextSibling);
+  // Inserare pe baza indexului numeric salvat (rezistă la reconstrucția ancorelor)
+  var normalRows = Array.from(tbody.querySelectorAll('tr')).filter(function(r){
+    return !r.classList.contains('clock-anchor') && !r.classList.contains('separator') && r.dataset.part === item.part;
+  });
+  var insertBefore = normalRows[item.posIndex] || null;
+  var sep = tbody.querySelector('.separator');
+  if (insertBefore) tbody.insertBefore(newRow, insertBefore);
+  else if (sep && item.part==='part1') tbody.insertBefore(newRow, sep);
   else tbody.appendChild(newRow);
   renderScoase(); updateAndSave();
 }
 function deleteRow(btn) {
   if (isViewerMode) return;
   pushUndo();
-  var row=btn.closest('tr'); var inputs=row.querySelectorAll('input');
+  var row=btn.closest('tr'); var tbody=document.querySelector('#table tbody');
+  var inputs=row.querySelectorAll('input');
   var title=inputs[0]?inputs[0].value:''; var video=inputs[1]?inputs[1].value:'00:00'; var cap=inputs[2]?inputs[2].value:'00:00';
-  scoaseList.push({ title:title, video:video, cap:cap, part:row.dataset.part||'part1', finished:row.classList.contains('finished'), status:row.dataset.status||'principala', nextSibling:row.nextElementSibling||null });
+  var part=row.dataset.part||'part1';
+  // Salvăm poziția ca index numeric — referințele DOM sunt fragile după ensureAnchorRows()
+  var posIndex=0; var found=false;
+  Array.from(tbody.querySelectorAll('tr')).forEach(function(r){
+    if (r===row){found=true;return;}
+    if (!found && !r.classList.contains('clock-anchor') && !r.classList.contains('separator') && r.dataset.part===part) posIndex++;
+  });
+  scoaseList.push({ title:title, video:video, cap:cap, part:part, finished:row.classList.contains('finished'), status:row.dataset.status||'principala', posIndex:posIndex });
   renderScoase(); row.remove(); updateAndSave();
 }
 function toggleFinish(btn) { if(isViewerMode) return; pushUndo(); btn.closest('tr').classList.toggle('finished'); updateAndSave(); }
-function moveUp(btn) { if(isViewerMode) return; pushUndo(); var row=btn.closest('tr'); var prev=row.previousElementSibling; if(prev&&!prev.classList.contains('separator')) row.parentNode.insertBefore(row,prev); updateAndSave(); }
-function moveDown(btn) { if(isViewerMode) return; pushUndo(); var row=btn.closest('tr'); var next=row.nextElementSibling; if(next) row.parentNode.insertBefore(next,row); updateAndSave(); }
+function moveUp(btn) {
+  if(isViewerMode) return; pushUndo();
+  var row=btn.closest('tr');
+  var prev=row.previousElementSibling;
+  while (prev && (prev.classList.contains('clock-anchor') || prev.classList.contains('separator'))) prev=prev.previousElementSibling;
+  if(prev) row.parentNode.insertBefore(row,prev);
+  updateAndSave();
+}
+function moveDown(btn) {
+  if(isViewerMode) return; pushUndo();
+  var row=btn.closest('tr');
+  var next=row.nextElementSibling;
+  while (next && next.classList.contains('clock-anchor')) next=next.nextElementSibling;
+  if(next && !next.classList.contains('separator')) row.parentNode.insertBefore(next,row);
+  updateAndSave();
+}
+
+var ANCHOR_INTERVAL = 5; // trebuie definit înainte de update()
 
 // ── UPDATE ───────────────────────────────────────────────────────
 window.update = function() {
+  // Gestionăm rândurile ancoră ÎNAINTE de loop — altfel le distrugem după ce setăm diffEl
+  ensureAnchorRows();
   var rows=document.querySelectorAll('#table tbody tr');
   var startJ=parseHour(document.getElementById('startJournal').value);
   var adTime=parseHour(document.getElementById('adTime').value);
@@ -1080,7 +1121,6 @@ window.update = function() {
   document.getElementById('timeLeftPart1').innerText=tl1>0?'⏱ Partea 1: Mai ai nevoie de '+fmt(tl1):tl1<0?'⚠️ Partea 1: Ai depășit cu '+fmt(Math.abs(tl1)):'✅ Partea 1: Exact la timp';
   document.getElementById('timeLeftPart2').innerText=p2act<planned2?'⏱ Partea 2: Mai ai nevoie de '+fmt(planned2-p2act):p2act>planned2?'⚠️ Partea 2: Ai depășit cu '+fmt(p2act-planned2):'✅ Partea 2: Exact la timp';
   window.updateViewerInfoBar();
-  ensureAnchorRows();
 };
 
 // ── SAVE / LOAD ──────────────────────────────────────────────────
@@ -1242,7 +1282,6 @@ function pressAtentie() {
 }
 
 // ── CLOCK ANCHOR ROWS ────────────────────────────────────────────────────────
-var ANCHOR_INTERVAL = 5;
 
 function makeAnchorRow(anchorValue) {
   var tr = document.createElement('tr');
