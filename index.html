@@ -190,6 +190,14 @@
   .highlight-ad-closest .total, .highlight-ad-closest .start, .highlight-ad-closest .end { color: #00e676 !important; font-weight: 700; }
   .finished { background: linear-gradient(90deg, #3a0000 0%, #200000 100%) !important; opacity: 0.7; }
   .finished td { color: #ff6060 !important; text-decoration: line-through; }
+  /* ── MOVE FLASH ANIMATION ── */
+  @keyframes rowMoveFlash {
+    0%   { background-color: #1a6a2a !important; box-shadow: inset 0 0 0 2px #44ff88; }
+    60%  { background-color: #0d3a18 !important; box-shadow: inset 0 0 0 2px #22cc66; }
+    100% { background-color: inherit !important; box-shadow: none; }
+  }
+  tr.row-moved { animation: rowMoveFlash 0.8s ease-out forwards; }
+
   .separator td { background: linear-gradient(90deg, #0c2040 0%, #071428 100%); color: #5bb8ff; font-weight: bold; font-size: 12px; letter-spacing: 1px; border: 1px solid #1a4a8a; text-align: center; padding: 5px; }
 
   .btn-status { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; margin-right: 4px; vertical-align: middle; padding: 0; transition: box-shadow 0.15s; }
@@ -627,6 +635,7 @@ const rundownRef  = ref(db, 'rundown/data');
 const tokenRef    = ref(db, 'rundown/token');
 
 let ignoreNextRemote = false;
+window._setIgnoreNext = function() { ignoreNextRemote = true; };
 
 window._fbSave = function(data) {
   ignoreNextRemote = true;
@@ -827,7 +836,7 @@ function isZeroCap(title) {
   for (var i=0;i<words.length;i++) if (matchesWord(title,words[i])) return true;
   return false;
 }
-function isComingUpLine(title) { return matchesWord(title,'coming up') || matchesWord(title,'c-up'); }
+function isComingUpLine(title) { return matchesWord(title,'coming up') || matchesWord(title,'c-up') || matchesWord(title,'cup'); }
 function cleanTitle(t) {
   t = t.replace(/[#\d$.,;:!?\/\\|@%^&*()\[\]{}_+=~`"']/g, '');
   t = t.replace(/^\s*[-–—]+\s*/, '').replace(/\s*[-–—]+\s*$/, '');
@@ -838,10 +847,20 @@ setInterval(updateClock, 1000); updateClock();
 function fmt(sec) { return String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0'); }
 function fmtClock(d) { return d.toLocaleTimeString('ro-RO', {hour12:false}); }
 function parseSec(t) {
-  t = (t||'').trim().toLowerCase(); if (!t) return 0;
+  t = (t||'').toString().trim().toLowerCase(); if (!t) return 0;
   if (t.includes(':')) { var p=t.split(':').map(Number); if (p.length===3) return p[0]*3600+p[1]*60+p[2]; return (p[0]||0)*60+(p[1]||0); }
-  var m = t.match(/(?:(\d+)m)?\s*(?:(\d+)s)?/); if (m) return (parseInt(m[1])||0)*60+(parseInt(m[2])||0);
-  return parseInt(t)||0;
+  // 2m30s, 2m30, 2m, 30s
+  var mMatch = t.match(/^(\d+)m\s*(\d+)?s?$/); if (mMatch) return (parseInt(mMatch[1])||0)*60+(parseInt(mMatch[2])||0);
+  // 30s
+  var sMatch = t.match(/^(\d+)s$/); if (sMatch) return parseInt(sMatch[1])||0;
+  // număr pur: <60 = sec, altfel MMSS (230=2:30, 130=1:30)
+  var n = parseInt(t);
+  if (!isNaN(n)) {
+    if (n < 60) return n;
+    if (n < 6000) { var mm=Math.floor(n/100); var ss=n%100; if (ss<60) return mm*60+ss; }
+    return n;
+  }
+  return 0;
 }
 function parseHour(t) { var p=(t||'').split(':').map(Number); var d=new Date(); d.setHours(p[0]||0,p[1]||0,p[2]||0,0); return d; }
 function normalizeInput(inp) { inp.value = fmt(parseSec(inp.value)); update(); }
@@ -1036,12 +1055,18 @@ function deleteRow(btn) {
   renderScoase(); row.remove(); updateAndSave();
 }
 function toggleFinish(btn) { if(isViewerMode) return; pushUndo(); btn.closest('tr').classList.toggle('finished'); updateAndSave(); }
+function flashRow(row) {
+  row.classList.remove('row-moved');
+  void row.offsetWidth; // force reflow pentru restart animație
+  row.classList.add('row-moved');
+  setTimeout(function() { row.classList.remove('row-moved'); }, 800);
+}
 function moveUp(btn) {
   if(isViewerMode) return; pushUndo();
   var row=btn.closest('tr');
   var prev=row.previousElementSibling;
   while (prev && (prev.classList.contains('clock-anchor') || prev.classList.contains('separator'))) prev=prev.previousElementSibling;
-  if(prev) row.parentNode.insertBefore(row,prev);
+  if(prev) { row.parentNode.insertBefore(row,prev); flashRow(row); }
   updateAndSave();
 }
 function moveDown(btn) {
@@ -1049,7 +1074,7 @@ function moveDown(btn) {
   var row=btn.closest('tr');
   var next=row.nextElementSibling;
   while (next && next.classList.contains('clock-anchor')) next=next.nextElementSibling;
-  if(next && !next.classList.contains('separator')) row.parentNode.insertBefore(next,row);
+  if(next && !next.classList.contains('separator')) { row.parentNode.insertBefore(next,row); flashRow(row); }
   updateAndSave();
 }
 
@@ -1174,6 +1199,8 @@ function normalizeAndSave(inp) { normalizeInput(inp); saveToCloud(); }
 var _saveTimer = null;
 function saveToCloud() {
   if (isViewerMode) return;
+  // Setăm ignoreNextRemote imediat — nu doar când _fbSave e apelat după debounce
+  if (window._setIgnoreNext) window._setIgnoreNext();
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(function() {
     if (window._fbSave) window._fbSave(getCurrentState());
@@ -1455,7 +1482,7 @@ function parseXlsxFile(file) {
         if (!col0) continue;
         if (!foundData) { foundData = true; continue; } // sărim primul rând (header cu data)
         var titleUpper = col0.toUpperCase().replace(/\s+/g,' ');
-        var isCU = titleUpper.includes('COMING UP') || titleUpper === 'C-UP';
+        var isCU = titleUpper.includes('COMING UP') || titleUpper === 'C-UP' || titleUpper === 'CUP';
         rows.push({ title: col0, durRaw: col1, isCU: isCU });
         if (isCU) break;
       }
