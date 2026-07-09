@@ -1102,7 +1102,12 @@ window.update = function() {
     runSec+=vid+cap;
   });
   rows.forEach(function(row) {
-    if (row.classList.contains('separator')) { startSec+=adDur; sep=true; return; }
+    if (row.classList.contains('separator')) {
+      startSec+=adDur+12; sep=true; p2act+=12;
+      var td=row.querySelector('td');
+      if(td) td.innerText='⬛ PUBLICITATE / PARTEA 2  ·  +12s intrare jurnal ⬛';
+      return;
+    }
     if (row.classList.contains('clock-anchor')) {
       var anchorInp = row.querySelector('input.anchor-time');
       var anchorVal = (anchorInp && anchorInp.value.trim()) ? anchorInp.value.trim() : '';
@@ -1141,7 +1146,7 @@ window.update = function() {
   document.getElementById('totalCap').innerText=fmt(totCap);
   document.getElementById('totalAll').innerText=fmt(totVid+totCap);
   document.getElementById('part1Totals').innerText='Partea 1 - Video: '+fmt(p1v)+', Cap: '+fmt(p1c)+', Total: '+fmt(p1v+p1c);
-  document.getElementById('part2Totals').innerText='Partea 2 - Video: '+fmt(p2v)+', Cap: '+fmt(p2c)+', Total: '+fmt(p2v+p2c);
+  document.getElementById('part2Totals').innerText='Partea 2 - Video: '+fmt(p2v)+', Cap: '+fmt(p2c)+', +12s jurnal, Total: '+fmt(p2v+p2c+12);
   var tl1=(adTime-startJ)/1000-(p1v+p1c);
   document.getElementById('timeLeftPart1').innerText=tl1>0?'⏱ Partea 1: Mai ai nevoie de '+fmt(tl1):tl1<0?'⚠️ Partea 1: Ai depășit cu '+fmt(Math.abs(tl1)):'✅ Partea 1: Exact la timp';
   document.getElementById('timeLeftPart2').innerText=p2act<planned2?'⏱ Partea 2: Mai ai nevoie de '+fmt(planned2-p2act):p2act>planned2?'⚠️ Partea 2: Ai depășit cu '+fmt(p2act-planned2):'✅ Partea 2: Exact la timp';
