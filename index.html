@@ -869,7 +869,11 @@ function normalizeInput(inp) { inp.value = fmt(parseSec(inp.value)); update(); }
 function handleTitleInput(inp) {
   if (isViewerMode) return;
   var row=inp.closest('tr'); var vid=row.cells[2].querySelector('input'); var cap=row.cells[3].querySelector('input'); var t=inp.value;
-  vid.value = fmt(getDefaultVideo(t));
+  // Setam video DOAR daca titlul contine un keyword — altfel lasam durata neschimbata
+  var hasKeyword = matchesWord(t,'coming up') || matchesWord(t,'c-up') || matchesWord(t,'cup') ||
+                   matchesWord(t,'pa') || matchesWord(t,'headuri') || matchesWord(t,'off') ||
+                   matchesWord(t,'sincron') || matchesWord(t,'ambianta') || matchesWord(t,'amb');
+  if (hasKeyword) vid.value = fmt(getDefaultVideo(t));
   if (isZeroCap(t)) cap.value='00:00'; else if (parseSec(cap.value)===0) cap.value='00:20';
   updateAndSave();
 }
@@ -974,7 +978,7 @@ function addRowWithUndo(part) { if(isViewerMode) return; pushUndo(); addRow(part
 window.addRow = function addRow(part, data) {
   part=part||'part1'; data=data||{};
   var title=data.title||'';
-  var video=data.video!==undefined?data.video:fmt(getDefaultVideo(title));
+  var video=data.video!==undefined?data.video:(title?fmt(getDefaultVideo(title)):'00:00');
   var cap=data.cap!==undefined?data.cap:(isZeroCap(title)?'00:00':'00:20');
   var tbody=document.querySelector('#table tbody'); var sep=tbody.querySelector('.separator');
   if (part==='part2' && !sep) {
