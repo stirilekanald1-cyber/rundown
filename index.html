@@ -497,7 +497,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     <button onclick="saveData()">💾 Salvează JSON</button>
     <button onclick="importData()">📂 Import JSON</button>
     <button onclick="resetPage()">🔄 Reset</button>
-    <button onclick="undo()">↩️ Undo (Ctrl+Z)</button>
+    <button onclick="undo()"↩️ Undo (Ctrl+Z)</button>
     <button id="closeJurnalBtn" onclick="closeJurnal()">📦 Închide jurnalul</button>
   </span>
   <input type="file" id="fileInput" style="display:none" accept=".json" onchange="handleImport(event)">
@@ -866,7 +866,28 @@ function parseSec(t) {
   return 0;
 }
 function parseHour(t) { var p=(t||'').split(':').map(Number); var d=new Date(); d.setHours(p[0]||0,p[1]||0,p[2]||0,0); return d; }
-function normalizeInput(inp) { inp.value = fmt(parseSec(inp.value)); update(); }
+function normalizeInput(inp) {
+  inp.value = fmt(parseSec(inp.value));
+  var row = inp.closest('tr');
+  if (row && row.cells[3] && row.cells[1]) {
+    var title = row.cells[1].querySelector('input').value;
+    var isOff3    = matchesWord(title,'off')&&!matchesWord(title,'amb')&&!matchesWord(title,'ambianta');
+    var isCupLine3 = matchesWord(title,'cup')||matchesWord(title,'c-up')||matchesWord(title,'coming up');
+    var isPa3      = matchesWord(title,'pa');
+    if (inp === row.cells[3].querySelector('input')) {
+      if (isOff3) {
+        row.cells[2].querySelector('input').value = '00:00';
+      } else if (isCupLine3) {
+        inp.value = '00:00';
+        row.cells[2].querySelector('input').value = '00:15';
+      } else if (isPa3) {
+        inp.value = '00:00';
+        row.cells[2].querySelector('input').value = '00:25';
+      }
+    }
+  }
+  update();
+}
 
 // ── PASTE ────────────────────────────────────────────────────────
 function handleTitleInput(inp) {
@@ -918,7 +939,26 @@ function handlePasteDurations(e, col) {
   // Sarim peste ancore si separator — dar duratele continua si pe P2
   var rows=Array.from(document.querySelectorAll('#table tbody tr:not(.separator):not(.clock-anchor)'));
   var si=rows.indexOf(e.target.closest('tr'));
-  lines.forEach(function(v,i){ if (rows[si+i]) rows[si+i].cells[col].querySelector('input').value=fmt(parseSec(v)); });
+  lines.forEach(function(v,i){
+    if (!rows[si+i]) return;
+    var row=rows[si+i];
+    var title=row.cells[1]?row.cells[1].querySelector('input').value:'';
+    var isOff4 = matchesWord(title,'off')&&!matchesWord(title,'amb')&&!matchesWord(title,'ambianta');
+    var isCup4 = matchesWord(title,'cup')||matchesWord(title,'c-up')||matchesWord(title,'coming up');
+    var isPa4  = matchesWord(title,'pa');
+    if (col===3 && isOff4) {
+      row.cells[3].querySelector('input').value=fmt(parseSec(v));
+      row.cells[2].querySelector('input').value='00:00';
+    } else if (col===3 && isCup4) {
+      row.cells[3].querySelector('input').value='00:00';
+      row.cells[2].querySelector('input').value='00:15';
+    } else if (col===3 && isPa4) {
+      row.cells[3].querySelector('input').value='00:00';
+      row.cells[2].querySelector('input').value='00:25';
+    } else {
+      row.cells[col].querySelector('input').value=fmt(parseSec(v));
+    }
+  });
   update();
 }
 
@@ -1154,7 +1194,7 @@ window.update = function() {
   });
   document.getElementById('totalVideo').innerText=fmt(totVid);
   document.getElementById('totalCap').innerText=fmt(totCap);
-  document.getElementById('totalAll').innerText=fmt(totVid+totCap);
+  document.getElementById('totalAll').innerText=fmt(totVid+totCap+(sep?12:0));
   document.getElementById('part1Totals').innerText='Partea 1 - Video: '+fmt(p1v)+', Cap: '+fmt(p1c)+', Total: '+fmt(p1v+p1c);
   document.getElementById('part2Totals').innerText='Partea 2 - Video: '+fmt(p2v)+', Cap: '+fmt(p2c)+', +12s jurnal, Total: '+fmt(p2v+p2c+12);
   // tl1: cat timp mai ai pana la pauza, luand in calcul decalajele reale ale ancorelor
