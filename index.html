@@ -791,7 +791,8 @@ function pushUndo() {
     adDuration    : document.getElementById('adDuration').value,
     plannedPart2  : document.getElementById('plannedPart2').value,
     jurnalDuration: document.getElementById('jurnalDuration').value,
-    rows          : getRowsData()
+    rows          : getRowsData(),
+    scoase        : JSON.parse(JSON.stringify(scoaseList))
   }));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
 }
@@ -806,6 +807,8 @@ function undo() {
   document.getElementById('jurnalDuration').value = state.jurnalDuration || '35:00';
   document.querySelector('#table tbody').innerHTML = '';
   (state.rows || []).forEach(function(d) { addRow(d.part, d); });
+  scoaseList = state.scoase || [];
+  renderScoase();
   update(); saveToCloud();
 }
 
@@ -887,15 +890,15 @@ function handlePaste(e, inp) {
   inp.value=lines[0];
   row.cells[2].querySelector('input').value=fmt(getDefaultVideo(lines[0]));
   row.cells[3].querySelector('input').value=isZeroCap(lines[0])?'00:00':'00:20';
-  var tbody=document.querySelector('#table tbody'); var sep=tbody.querySelector('.separator');
-  var cur=row; var switchedToPart2=false;
+  // Dacă primul rând e deja CUP/C-UP/COMING UP, ne oprim
+  if (part==='part1' && isComingUpLine(lines[0])) { update(); return; }
+  var tbody=document.querySelector('#table tbody');
+  var cur=row;
   for (var i=1;i<lines.length;i++) {
-    if (isComingUpLine(lines[i-1])) switchedToPart2=true;
-    var linePart=(switchedToPart2||part==='part2')?'part2':'part1';
-    if (linePart==='part2' && !sep) { sep=document.createElement('tr'); sep.className='separator'; var td=document.createElement('td'); td.colSpan=8; td.innerText='⬛ PUBLICITATE / PARTEA 2 ⬛'; sep.appendChild(td); tbody.appendChild(sep); }
-    var nr=makeRow(linePart,lines[i],fmt(getDefaultVideo(lines[i])),isZeroCap(lines[i])?'00:00':'00:20','rezerva');
-    if (linePart==='part1') {
-      // Sărim peste ancorele de timp când căutăm poziția de inserare
+    // Dacă rândul anterior era CUP/C-UP/COMING UP, ne oprim
+    if (part==='part1' && isComingUpLine(lines[i-1])) break;
+    var nr=makeRow(part,lines[i],fmt(getDefaultVideo(lines[i])),isZeroCap(lines[i])?'00:00':'00:20','rezerva');
+    if (part==='part1') {
       var ins=cur.nextElementSibling;
       while (ins && ins.classList.contains('clock-anchor')) ins=ins.nextElementSibling;
       if (ins&&ins.classList.contains('separator')) tbody.insertBefore(nr,ins);
@@ -912,7 +915,7 @@ function handlePasteDurations(e, col) {
   if (!text.includes('\n')) return;
   e.preventDefault();
   var lines=text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
-  // Excludem ancorele de timp — altfel indexul se decalează și duratele ajung pe rânduri greșite
+  // Sarim peste ancore si separator — dar duratele continua si pe P2
   var rows=Array.from(document.querySelectorAll('#table tbody tr:not(.separator):not(.clock-anchor)'));
   var si=rows.indexOf(e.target.closest('tr'));
   lines.forEach(function(v,i){ if (rows[si+i]) rows[si+i].cells[col].querySelector('input').value=fmt(parseSec(v)); });
@@ -1094,19 +1097,13 @@ window.update = function() {
   var adDur=parseSec(document.getElementById('adDuration').value);
   var planned2=parseSec(document.getElementById('plannedPart2').value);
   var totVid=0,totCap=0,startSec=0,p1v=0,p1c=0,p2v=0,p2c=0,p2act=0,idx=1,sep=false;
+  var p1EndSec=0; // startSec la momentul intrarii in P2 (dupa ancore)
   var adTimeSec=(adTime-startJ)/1000;
-  var bestRow=null,bestDiff=Infinity,runSec=0;
-  rows.forEach(function(row) {
-    if (row.classList.contains('separator')||row.classList.contains('clock-anchor')) { if(row.classList.contains('separator')) runSec+=adDur; return; }
-    if (row.dataset.part==='part2') return;
-    var vid=parseSec(row.cells[2].querySelector('input').value)||0;
-    var cap=parseSec(row.cells[3].querySelector('input').value)||0;
-    var endSec=runSec+vid+cap; var diff=Math.abs(endSec-adTimeSec);
-    if (diff<bestDiff) { bestDiff=diff; bestRow=row; }
-    runSec+=vid+cap;
-  });
+  var bestRow=null,bestDiff=Infinity;
+  // bestRow se calculeaza in loop-ul principal unde startSec include ancorele
   rows.forEach(function(row) {
     if (row.classList.contains('separator')) {
+      p1EndSec=startSec; // salvam startSec real la sfarsitul P1 (include decalajele ancorelor)
       startSec+=adDur+12; sep=true; p2act+=12;
       var td=row.querySelector('td');
       if(td) td.innerText='⬛ PUBLICITATE / PARTEA 2  ·  +12s intrare jurnal ⬛';
@@ -1139,19 +1136,32 @@ window.update = function() {
     var cap=parseSec(row.cells[3].querySelector('input').value)||0;
     var total=vid+cap;
     if (title.toLowerCase().includes('coming up')||matchesWord(title,'c-up')||matchesWord(title,'pa')) row.classList.add('highlight-yellow'); else row.classList.remove('highlight-yellow');
-    if (row===bestRow&&!row.classList.contains('highlight-yellow')) row.classList.add('highlight-ad-closest'); else row.classList.remove('highlight-ad-closest');
+    if(row.classList.contains('highlight-yellow')) row.classList.remove('highlight-ad-closest');
+    else row.classList.remove('highlight-ad-closest'); // se aplica dupa loop
     if (!sep) { p1v+=vid; p1c+=cap; } else { p2v+=vid; p2c+=cap; p2act+=total; }
     row.querySelector('.total').innerText=fmt(total);
     row.querySelector('.start').innerText=fmt(startSec);
     row.querySelector('.end').innerText=fmtClock(new Date(startJ.getTime()+(startSec+total)*1000));
+    // bestRow cu startSec real (include ancorele)
+    if (!sep) { var endSec=startSec+total; var diff=Math.abs(endSec-adTimeSec); if(diff<bestDiff){bestDiff=diff;bestRow=row;} }
     startSec+=total; totVid+=vid; totCap+=cap;
+  });
+  // Aplicam highlight dupa loop cand bestRow e calculat corect
+  rows.forEach(function(row){
+    if(row.classList.contains('separator')||row.classList.contains('clock-anchor')) return;
+    if(row===bestRow&&!row.classList.contains('highlight-yellow')) row.classList.add('highlight-ad-closest');
+    else row.classList.remove('highlight-ad-closest');
   });
   document.getElementById('totalVideo').innerText=fmt(totVid);
   document.getElementById('totalCap').innerText=fmt(totCap);
   document.getElementById('totalAll').innerText=fmt(totVid+totCap);
   document.getElementById('part1Totals').innerText='Partea 1 - Video: '+fmt(p1v)+', Cap: '+fmt(p1c)+', Total: '+fmt(p1v+p1c);
   document.getElementById('part2Totals').innerText='Partea 2 - Video: '+fmt(p2v)+', Cap: '+fmt(p2c)+', +12s jurnal, Total: '+fmt(p2v+p2c+12);
-  var tl1=(adTime-startJ)/1000-(p1v+p1c);
+  // tl1: cat timp mai ai pana la pauza, luand in calcul decalajele reale ale ancorelor
+  // Folosim p1EndSec (startSec la momentul separatorului) daca exista P2,
+  // altfel startSec final (toate stirile P1 procesate)
+  var realP1End = sep ? p1EndSec : startSec;
+  var tl1 = adTimeSec - realP1End;
   document.getElementById('timeLeftPart1').innerText=tl1>0?'⏱ Partea 1: Mai ai nevoie de '+fmt(tl1):tl1<0?'⚠️ Partea 1: Ai depășit cu '+fmt(Math.abs(tl1)):'✅ Partea 1: Exact la timp';
   document.getElementById('timeLeftPart2').innerText=p2act<planned2?'⏱ Partea 2: Mai ai nevoie de '+fmt(planned2-p2act):p2act>planned2?'⚠️ Partea 2: Ai depășit cu '+fmt(p2act-planned2):'✅ Partea 2: Exact la timp';
   window.updateViewerInfoBar();
@@ -1335,9 +1345,31 @@ function makeAnchorRow(anchorValue) {
   inp.value = anchorValue || '';
   inp.addEventListener('blur', function() {
     var v = this.value.trim();
-    if (v && !v.includes(':')) {
-      if (v.length === 6) v = v.substring(0,2)+':'+v.substring(2,4)+':'+v.substring(4,6);
-      else if (v.length === 4) v = v.substring(0,2)+':'+v.substring(2,4)+':00';
+    if (v) {
+      // Normalizare format fara doua puncte
+      if (!v.includes(':')) {
+        if (v.length === 6) v = v.substring(0,2)+':'+v.substring(2,4)+':'+v.substring(4,6);
+        else if (v.length === 4) v = v.substring(0,2)+':'+v.substring(2,4)+':00';
+      }
+      // Validare: trebuie sa fie exact HH:MM:SS cu valori rezonabile
+      var parts = v.split(':');
+      if (parts.length === 3) {
+        var hh = parseInt(parts[0])||0, mm = parseInt(parts[1])||0, ss = parseInt(parts[2])||0;
+        if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59 && ss >= 0 && ss <= 59) {
+          v = String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+        } else {
+          v = ''; // format invalid, resetam
+        }
+      } else if (parts.length === 2) {
+        var hh = parseInt(parts[0])||0, mm = parseInt(parts[1])||0;
+        if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) {
+          v = String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':00';
+        } else {
+          v = '';
+        }
+      } else {
+        v = ''; // nu e un format valid
+      }
       this.value = v;
     }
     updateAndSave();
@@ -1381,7 +1413,10 @@ function ensureAnchorRows() {
       anchorValueByPos[p1Count] = row.querySelector('input.anchor-time').value;
       return;
     }
-    if (row.dataset.part === 'part1') p1Count++;
+    if (row.dataset.part === 'part1') {
+      var title = row.cells && row.cells[1] ? row.cells[1].querySelector('input')?.value : '';
+      if (title) p1Count++;
+    }
   });
 
   // Ștergem ancorele existente
@@ -1393,6 +1428,9 @@ function ensureAnchorRows() {
   freshRows.forEach(function(row) {
     if (row.classList.contains('separator')) { hitSep = true; return; }
     if (hitSep || row.classList.contains('clock-anchor')) return;
+    // Ignorăm rândul gol inițial (fără titlu) — altfel ancora apare o știre mai devreme
+    var title = row.cells && row.cells[1] ? row.cells[1].querySelector('input')?.value : '';
+    if (!title) return;
     count++;
     if (count % ANCHOR_INTERVAL === 0) insertPoints.push({ after: row, pos: count });
   });
