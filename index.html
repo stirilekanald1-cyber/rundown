@@ -471,7 +471,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
 <div class="clock-row">
   <div id="clock">00:00:00</div>
-  <label>Durata jurnal: <input id="jurnalDuration" placeholder="MM:SS" value="35:00" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <label>Durata jurnal: <input id="jurnalDuration" placeholder="MM:SS" value="41:00" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <label>Durata meteo: <input id="meteoDuration" placeholder="MM:SS" value="03:30" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -489,15 +490,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
      SETTINGS BAR (vizibil doar pentru editor)
 ══════════════════════════════════════════════ -->
 <div class="settings">
-  <label>Start jurnal: <input id="startJournal" placeholder="HH:MM:SS" value="18:57:00" onfocus="pushUndo()" onblur="updateAndSave()" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <label>Start jurnal: <input id="startJournal" placeholder="HH:MM:SS" value="18:57:30" onfocus="pushUndo()" onblur="updateAndSave()" onkeydown="if(event.key==='Enter')this.blur()"></label>
   <label>Ora publicitate: <input id="adTime" placeholder="HH:MM:SS" value="19:30:00" onfocus="pushUndo()" onblur="updateAndSave()" onkeydown="if(event.key==='Enter')this.blur()"></label>
-  <label>Durata publicitate: <input id="adDuration" placeholder="MM:SS" value="05:00" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
-  <label>Durata planificată Partea 2: <input id="plannedPart2" placeholder="MM:SS" value="04:00" style="width:70px" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <label>Durata publicitate: <input id="adDuration" placeholder="MM:SS" value="00:00" onfocus="pushUndo()" onblur="normalizeAndSave(this)" onkeydown="if(event.key==='Enter')this.blur()"></label>
+  <input id="plannedPart2" type="hidden" value="00:00">
   <span id="editorControls" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
     <button onclick="saveData()">💾 Salvează JSON</button>
     <button onclick="importData()">📂 Import JSON</button>
     <button onclick="resetPage()">🔄 Reset</button>
-    <button onclick="undo()"↩️ Undo (Ctrl+Z)</button>
+    <button onclick="undo()">↩️ Undo (Ctrl+Z)</button>
     <button id="closeJurnalBtn" onclick="closeJurnal()">📦 Închide jurnalul</button>
   </span>
   <input type="file" id="fileInput" style="display:none" accept=".json" onchange="handleImport(event)">
@@ -525,7 +526,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     <p>Total capuri: <span id="totalCap">00:00</span></p>
     <p>Total jurnal: <span id="totalAll">00:00</span></p>
     <p id="timeLeftPart1"></p>
-    <p id="timeLeftPart2"></p>
+    <p id="timeLeftPart2" style="display:none"></p>
   </div>
   <div class="atentie-wrapper">
     <button id="atentieBtn" onclick="pressAtentie()">⚠️ ATENȚIE</button>
@@ -656,6 +657,7 @@ window._fbListen = function() {
       document.getElementById('loadingOverlay').style.display = 'none';
       const data = snapshot.val();
       if (data) { setSyncStatus('synced'); loadRemoteData(data); }
+      else { setDefaultStartByDay(); } // jurnal nou — start standard dupa zi
       return;
     }
     if (ignoreNextRemote) { ignoreNextRemote = false; return; }
@@ -665,6 +667,15 @@ window._fbListen = function() {
     loadRemoteData(data);
   });
 };
+
+// Setare automata Start jurnal in functie de zi: L-V 18:57:30, S-D 17:57:30
+window.setDefaultStartByDay = function() {
+  var day = new Date().getDay(); // 0=duminica, 6=sambata
+  var isWeekend = (day === 0 || day === 6);
+  var el = document.getElementById('startJournal');
+  if (el) el.value = isWeekend ? '17:57:30' : '18:57:30';
+};
+function setDefaultStartByDay() { window.setDefaultStartByDay(); }
 
 window._startFirebase = function() { window._fbListen(); };
 
@@ -679,11 +690,17 @@ function setSyncStatus(state) {
 
 function loadRemoteData(obj) {
   if (!obj) return;
-  document.getElementById('startJournal').value   = obj.startJournal   || '18:57:00';
+  // Daca datele salvate NU au startJournal, aplicam standardul dupa zi
+  if (obj.startJournal) {
+    document.getElementById('startJournal').value = obj.startJournal;
+  } else {
+    window.setDefaultStartByDay();
+  }
   document.getElementById('adTime').value         = obj.adTime         || '19:30:00';
-  document.getElementById('adDuration').value     = obj.adDuration     || '05:00';
-  document.getElementById('plannedPart2').value   = obj.plannedPart2   || '04:00';
-  document.getElementById('jurnalDuration').value = obj.jurnalDuration || '35:00';
+  document.getElementById('adDuration').value     = obj.adDuration     || '00:00';
+  document.getElementById('plannedPart2').value   = obj.plannedPart2   || '00:00';
+  document.getElementById('jurnalDuration').value = obj.jurnalDuration || '41:00';
+  document.getElementById('meteoDuration').value = obj.meteoDuration || '03:30';
   document.getElementById('observatiiText').value = obj.observatii     || '';
 
   // Actualizează și panoul viewer de fiecare dată când vin date noi
@@ -791,6 +808,7 @@ function pushUndo() {
     adDuration    : document.getElementById('adDuration').value,
     plannedPart2  : document.getElementById('plannedPart2').value,
     jurnalDuration: document.getElementById('jurnalDuration').value,
+    meteoDuration : document.getElementById('meteoDuration').value,
     rows          : getRowsData(),
     scoase        : JSON.parse(JSON.stringify(scoaseList))
   }));
@@ -800,11 +818,12 @@ function pushUndo() {
 function undo() {
   if (isViewerMode || undoStack.length === 0) return;
   var state = JSON.parse(undoStack.pop());
-  document.getElementById('startJournal').value   = state.startJournal   || '18:57:00';
+  document.getElementById('startJournal').value   = state.startJournal   || '18:57:30';
   document.getElementById('adTime').value         = state.adTime         || '19:30:00';
-  document.getElementById('adDuration').value     = state.adDuration     || '05:00';
-  document.getElementById('plannedPart2').value   = state.plannedPart2   || '04:00';
-  document.getElementById('jurnalDuration').value = state.jurnalDuration || '35:00';
+  document.getElementById('adDuration').value     = state.adDuration     || '00:00';
+  document.getElementById('plannedPart2').value   = state.plannedPart2   || '00:00';
+  document.getElementById('jurnalDuration').value = state.jurnalDuration || '41:00';
+  document.getElementById('meteoDuration').value = state.meteoDuration || '03:30';
   document.querySelector('#table tbody').innerHTML = '';
   (state.rows || []).forEach(function(d) { addRow(d.part, d); });
   scoaseList = state.scoase || [];
@@ -871,19 +890,12 @@ function normalizeInput(inp) {
   var row = inp.closest('tr');
   if (row && row.cells[3] && row.cells[1]) {
     var title = row.cells[1].querySelector('input').value;
-    var isOff3    = matchesWord(title,'off')&&!matchesWord(title,'amb')&&!matchesWord(title,'ambianta');
-    var isCupLine3 = matchesWord(title,'cup')||matchesWord(title,'c-up')||matchesWord(title,'coming up');
-    var isPa3      = matchesWord(title,'pa');
-    if (inp === row.cells[3].querySelector('input')) {
-      if (isOff3) {
-        row.cells[2].querySelector('input').value = '00:00';
-      } else if (isCupLine3) {
-        inp.value = '00:00';
-        row.cells[2].querySelector('input').value = '00:15';
-      } else if (isPa3) {
-        inp.value = '00:00';
-        row.cells[2].querySelector('input').value = '00:25';
-      }
+    var isSpecial = matchesWord(title,'off')||matchesWord(title,'cup')||
+                    matchesWord(title,'c-up')||matchesWord(title,'coming up')||
+                    matchesWord(title,'pa');
+    // Editare manuala cap pe OFF/CUP/PA → cap 00:00, video ramane cum l-ai pus
+    if (isSpecial && inp === row.cells[3].querySelector('input')) {
+      inp.value = '00:00';
     }
   }
   update();
@@ -943,12 +955,16 @@ function handlePasteDurations(e, col) {
     if (!rows[si+i]) return;
     var row=rows[si+i];
     var title=row.cells[1]?row.cells[1].querySelector('input').value:'';
+    var isOffAmb4 = matchesWord(title,'off')&&(matchesWord(title,'amb')||matchesWord(title,'ambianta'));
     var isOff4 = matchesWord(title,'off')&&!matchesWord(title,'amb')&&!matchesWord(title,'ambianta');
     var isCup4 = matchesWord(title,'cup')||matchesWord(title,'c-up')||matchesWord(title,'coming up');
     var isPa4  = matchesWord(title,'pa');
-    if (col===3 && isOff4) {
-      row.cells[3].querySelector('input').value=fmt(parseSec(v));
-      row.cells[2].querySelector('input').value='00:00';
+    if (col===3 && isOffAmb4) {
+      row.cells[2].querySelector('input').value='00:45';
+      row.cells[3].querySelector('input').value='00:00';
+    } else if (col===3 && isOff4) {
+      row.cells[2].querySelector('input').value='00:30';
+      row.cells[3].querySelector('input').value='00:00';
     } else if (col===3 && isCup4) {
       row.cells[3].querySelector('input').value='00:00';
       row.cells[2].querySelector('input').value='00:15';
@@ -1074,13 +1090,21 @@ function repuneRow(idx) {
   var tbody=document.querySelector('#table tbody');
   var newRow=makeRow(item.part,item.title,item.video!==undefined?item.video:fmt(getDefaultVideo(item.title)),item.cap!==undefined?item.cap:(isZeroCap(item.title)?'00:00':'00:20'),item.status||'rezerva');
   if (item.finished) newRow.classList.add('finished');
-  // Inserare pe baza indexului numeric salvat (rezistă la reconstrucția ancorelor)
   var normalRows = Array.from(tbody.querySelectorAll('tr')).filter(function(r){
-    return !r.classList.contains('clock-anchor') && !r.classList.contains('separator') && r.dataset.part === item.part;
+    if (r.classList.contains('clock-anchor') || r.classList.contains('separator')) return false;
+    if (r.dataset.part !== item.part) return false;
+    var t = r.cells[1] ? r.cells[1].querySelector('input').value : '';
+    return !!t;
   });
-  var insertBefore = normalRows[item.posIndex] || null;
+  // Pozitia curenta din origPos: scadem 1 pentru fiecare stire inca scoasa cu origPos mai mic
+  var curPos = (item.origPos !== undefined ? item.origPos : item.posIndex);
+  scoaseList.forEach(function(s){
+    if (s.part === item.part && s.origPos !== undefined && s.origPos < item.origPos) curPos--;
+  });
+  if (curPos < 0) curPos = 0;
+  var insertBefore = normalRows[curPos] || null;
   var sep = tbody.querySelector('.separator');
-  if (insertBefore) tbody.insertBefore(newRow, insertBefore);
+  if (insertBefore && !insertBefore.classList.contains('separator')) tbody.insertBefore(newRow, insertBefore);
   else if (sep && item.part==='part1') tbody.insertBefore(newRow, sep);
   else tbody.appendChild(newRow);
   renderScoase(); updateAndSave();
@@ -1092,13 +1116,19 @@ function deleteRow(btn) {
   var inputs=row.querySelectorAll('input');
   var title=inputs[0]?inputs[0].value:''; var video=inputs[1]?inputs[1].value:'00:00'; var cap=inputs[2]?inputs[2].value:'00:00';
   var part=row.dataset.part||'part1';
-  // Salvăm poziția ca index numeric — referințele DOM sunt fragile după ensureAnchorRows()
   var posIndex=0; var found=false;
   Array.from(tbody.querySelectorAll('tr')).forEach(function(r){
     if (r===row){found=true;return;}
-    if (!found && !r.classList.contains('clock-anchor') && !r.classList.contains('separator') && r.dataset.part===part) posIndex++;
+    if (found) return;
+    if (r.classList.contains('clock-anchor') || r.classList.contains('separator')) return;
+    if (r.dataset.part!==part) return;
+    var t = r.cells[1] ? r.cells[1].querySelector('input').value : '';
+    if (t) posIndex++;
   });
-  scoaseList.push({ title:title, video:video, cap:cap, part:part, finished:row.classList.contains('finished'), status:row.dataset.status||'principala', posIndex:posIndex });
+  // origPos = pozitia absoluta (luand in calcul randurile deja scoase cu pos <= posIndex)
+  var origPos = posIndex;
+  scoaseList.forEach(function(s){ if (s.part===part && s.origPos<=origPos) origPos++; });
+  scoaseList.push({ title:title, video:video, cap:cap, part:part, finished:row.classList.contains('finished'), status:row.dataset.status||'principala', posIndex:posIndex, origPos:origPos });
   renderScoase(); row.remove(); updateAndSave();
 }
 function toggleFinish(btn) { if(isViewerMode) return; pushUndo(); btn.closest('tr').classList.toggle('finished'); updateAndSave(); }
@@ -1137,6 +1167,7 @@ window.update = function() {
   var adDur=parseSec(document.getElementById('adDuration').value);
   var planned2=parseSec(document.getElementById('plannedPart2').value);
   var totVid=0,totCap=0,startSec=0,p1v=0,p1c=0,p2v=0,p2c=0,p2act=0,idx=1,sep=false;
+  var totalDecalaj=0; // decalajul cumulat de la ancore (capete citite mai lent/rapid)
   var p1EndSec=0; // startSec la momentul intrarii in P2 (dupa ancore)
   var adTimeSec=(adTime-startJ)/1000;
   var bestRow=null,bestDiff=Infinity;
@@ -1144,9 +1175,10 @@ window.update = function() {
   rows.forEach(function(row) {
     if (row.classList.contains('separator')) {
       p1EndSec=startSec; // salvam startSec real la sfarsitul P1 (include decalajele ancorelor)
+      var reincepeClock=fmtClock(new Date(startJ.getTime()+(startSec+adDur)*1000));
       startSec+=adDur+12; sep=true; p2act+=12;
       var td=row.querySelector('td');
-      if(td) td.innerText='⬛ PUBLICITATE / PARTEA 2  ·  +12s intrare jurnal ⬛';
+      if(td) td.innerText='⬛ PUBLICITATE / PARTEA 2  ·  Reîncepe jurnal: '+reincepeClock+'  ·  +12s generic ⬛';
       return;
     }
     if (row.classList.contains('clock-anchor')) {
@@ -1158,6 +1190,7 @@ window.update = function() {
         var newStartSec = Math.round((anchorDate - startJ) / 1000);
         if (newStartSec >= 0) {
           var diffSec = newStartSec - startSec;
+          totalDecalaj += diffSec; // acumulam decalajul
           if (diffEl) {
             if (Math.abs(diffSec) <= 5) { diffEl.className='anchor-diff ontime'; diffEl.innerText='✓ La timp'; }
             else if (diffSec < 0) { diffEl.className='anchor-diff ahead'; diffEl.innerText='▲ +'+fmt(Math.abs(diffSec)); }
@@ -1194,7 +1227,7 @@ window.update = function() {
   });
   document.getElementById('totalVideo').innerText=fmt(totVid);
   document.getElementById('totalCap').innerText=fmt(totCap);
-  document.getElementById('totalAll').innerText=fmt(totVid+totCap+(sep?12:0));
+  document.getElementById('totalAll').innerText=fmt(totVid+totCap+(sep?12:0)+totalDecalaj);
   document.getElementById('part1Totals').innerText='Partea 1 - Video: '+fmt(p1v)+', Cap: '+fmt(p1c)+', Total: '+fmt(p1v+p1c);
   document.getElementById('part2Totals').innerText='Partea 2 - Video: '+fmt(p2v)+', Cap: '+fmt(p2c)+', +12s jurnal, Total: '+fmt(p2v+p2c+12);
   // tl1: cat timp mai ai pana la pauza, luand in calcul decalajele reale ale ancorelor
@@ -1203,7 +1236,6 @@ window.update = function() {
   var realP1End = sep ? p1EndSec : startSec;
   var tl1 = adTimeSec - realP1End;
   document.getElementById('timeLeftPart1').innerText=tl1>0?'⏱ Partea 1: Mai ai nevoie de '+fmt(tl1):tl1<0?'⚠️ Partea 1: Ai depășit cu '+fmt(Math.abs(tl1)):'✅ Partea 1: Exact la timp';
-  document.getElementById('timeLeftPart2').innerText=p2act<planned2?'⏱ Partea 2: Mai ai nevoie de '+fmt(planned2-p2act):p2act>planned2?'⚠️ Partea 2: Ai depășit cu '+fmt(p2act-planned2):'✅ Partea 2: Exact la timp';
   window.updateViewerInfoBar();
 };
 
@@ -1222,6 +1254,7 @@ function getCurrentState() {
     adDuration    : document.getElementById('adDuration').value,
     plannedPart2  : document.getElementById('plannedPart2').value,
     jurnalDuration: document.getElementById('jurnalDuration').value,
+    meteoDuration : document.getElementById('meteoDuration').value,
     observatii    : document.getElementById('observatiiText').value,
     rows          : getRowsData(),
     anchors       : getAnchorData(),
@@ -1244,7 +1277,8 @@ function handleImport(event) {
     document.getElementById('adTime').value        =obj.adTime        ||'19:30:00';
     document.getElementById('adDuration').value    =obj.adDuration    ||'05:00';
     document.getElementById('plannedPart2').value  =obj.plannedPart2  ||'04:00';
-    document.getElementById('jurnalDuration').value=obj.jurnalDuration||'35:00';
+    document.getElementById('jurnalDuration').value=obj.jurnalDuration||'41:00';
+    document.getElementById('meteoDuration').value=obj.meteoDuration||'03:30';
     document.getElementById('observatiiText').value=obj.observatii    ||'';
     document.querySelector('#table tbody').innerHTML='';
     obj.rows.forEach(function(d){ addRow(d.part,d); });
@@ -1274,7 +1308,8 @@ function resetPage() {
     document.getElementById('adTime').value='19:30:00';
     document.getElementById('adDuration').value='05:00';
     document.getElementById('plannedPart2').value='04:00';
-    document.getElementById('jurnalDuration').value='35:00';
+    document.getElementById('jurnalDuration').value='41:00';
+    document.getElementById('meteoDuration').value='03:30';
     document.getElementById('observatiiText').value='';
     update();
   }
@@ -1292,7 +1327,8 @@ function closeJurnal() {
     document.getElementById('adTime').value='19:30:00';
     document.getElementById('adDuration').value='05:00';
     document.getElementById('plannedPart2').value='04:00';
-    document.getElementById('jurnalDuration').value='35:00';
+    document.getElementById('jurnalDuration').value='41:00';
+    document.getElementById('meteoDuration').value='03:30';
     document.getElementById('observatiiText').value='';
     update();
   }, 400);
