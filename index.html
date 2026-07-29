@@ -1226,7 +1226,7 @@ window.update = function() {
     else row.classList.remove('highlight-ad-closest');
   });
   document.getElementById('totalVideo').innerText=fmt(totVid);
-  document.getElementById('totalCap').innerText=fmt(totCap);
+  document.getElementById('totalCap').innerText=fmt(totCap + totalDecalaj);
   document.getElementById('totalAll').innerText=fmt(totVid+totCap+(sep?12:0)+totalDecalaj);
   document.getElementById('part1Totals').innerText='Partea 1 - Video: '+fmt(p1v)+', Cap: '+fmt(p1c)+', Total: '+fmt(p1v+p1c);
   document.getElementById('part2Totals').innerText='Partea 2 - Video: '+fmt(p2v)+', Cap: '+fmt(p2c)+', +12s jurnal, Total: '+fmt(p2v+p2c+12);
