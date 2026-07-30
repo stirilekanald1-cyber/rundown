@@ -1138,18 +1138,51 @@ function flashRow(row) {
   row.classList.add('row-moved');
   setTimeout(function() { row.classList.remove('row-moved'); }, 800);
 }
+// Determina in ce parte (part1/part2) se afla fizic un rand, pe baza pozitiei fata de separator
+function partByPosition(row) {
+  var sep = document.querySelector('#table tbody tr.separator');
+  if (!sep) return 'part1';
+  var cur = sep;
+  while (cur) {
+    if (cur === row) return 'part2';
+    cur = cur.nextElementSibling;
+  }
+  return 'part1';
+}
 function moveUp(btn) {
   if(isViewerMode) return; pushUndo();
   var row=btn.closest('tr');
   var prev=row.previousElementSibling;
-  while (prev && (prev.classList.contains('clock-anchor') || prev.classList.contains('separator'))) prev=prev.previousElementSibling;
-  if(prev) { row.parentNode.insertBefore(row,prev); flashRow(row); }
+  var crossedSep=false;
+  while (prev && (prev.classList.contains('clock-anchor') || prev.classList.contains('separator'))) {
+    if (prev.classList.contains('separator')) crossedSep=true;
+    prev=prev.previousElementSibling;
+  }
+  if(prev) {
+    row.parentNode.insertBefore(row,prev);
+    if (crossedSep) row.dataset.part = partByPosition(row);
+    flashRow(row);
+  }
   updateAndSave();
 }
 function moveDown(btn) {
   if(isViewerMode) return; pushUndo();
   var row=btn.closest('tr');
   var next=row.nextElementSibling;
+  // Verificam daca urmatorul element (sarind ancore) e separatorul
+  var probe=next;
+  while (probe && probe.classList.contains('clock-anchor')) probe=probe.nextElementSibling;
+  if (probe && probe.classList.contains('separator')) {
+    // Ultimul din partea lui, urmeaza separatorul → il mutam DUPA separator (in P2)
+    var afterSep=probe.nextElementSibling;
+    while (afterSep && afterSep.classList.contains('clock-anchor')) afterSep=afterSep.nextElementSibling;
+    if (afterSep) row.parentNode.insertBefore(row, afterSep);
+    else row.parentNode.appendChild(row);
+    row.dataset.part = partByPosition(row);
+    flashRow(row);
+    updateAndSave();
+    return;
+  }
   while (next && next.classList.contains('clock-anchor')) next=next.nextElementSibling;
   if(next && !next.classList.contains('separator')) { row.parentNode.insertBefore(next,row); flashRow(row); }
   updateAndSave();
