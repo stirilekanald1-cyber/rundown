@@ -709,7 +709,7 @@ function loadRemoteData(obj) {
   window.updateViewerInfoBar();
 
   document.querySelector('#table tbody').innerHTML = '';
-  (obj.rows || []).forEach(function(d) { window.addRow(d.part, d); });
+  (obj.rows || []).forEach(function(d) { window.addRow(d.part, d, true); });
   window.scoaseList = obj.scoase || [];
   window.renderScoase();
   window.update();
@@ -827,7 +827,7 @@ function undo() {
   document.getElementById('jurnalDuration').value = state.jurnalDuration || '41:00';
   document.getElementById('meteoDuration').value = state.meteoDuration || '03:30';
   document.querySelector('#table tbody').innerHTML = '';
-  (state.rows || []).forEach(function(d) { addRow(d.part, d); });
+  (state.rows || []).forEach(function(d) { addRow(d.part, d, true); });
   scoaseList = state.scoase || [];
   renderScoase();
   update(); saveToCloud();
@@ -1036,7 +1036,7 @@ function makeRow(part, title, video, cap, status) {
 
 function addRowWithUndo(part) { if(isViewerMode) return; pushUndo(); addRow(part); }
 
-window.addRow = function addRow(part, data) {
+window.addRow = function addRow(part, data, skipUpdate) {
   part=part||'part1'; data=data||{};
   var title=data.title||'';
   var video=data.video!==undefined?data.video:(title?fmt(getDefaultVideo(title)):'00:00');
@@ -1051,7 +1051,8 @@ window.addRow = function addRow(part, data) {
   if (data.finished) row.classList.add('finished');
   if (part==='part1') { if (sep) tbody.insertBefore(row,sep); else tbody.appendChild(row); }
   else tbody.appendChild(row);
-  updateAndSave();
+  // skipUpdate=true la operatii in bloc (incarcare) — un singur update la final
+  if (!skipUpdate) updateAndSave();
 };
 
 // ── SCOASE ───────────────────────────────────────────────────────
@@ -1240,8 +1241,7 @@ window.update = function() {
   var startJ=parseHour(document.getElementById('startJournal').value);
   var adTime=parseHour(document.getElementById('adTime').value);
   var adDur=parseSec(document.getElementById('adDuration').value);
-  var planned2=parseSec(document.getElementById('plannedPart2').value);
-  var totVid=0,totCap=0,startSec=0,p1v=0,p1c=0,p2v=0,p2c=0,p2act=0,idx=1,sep=false;
+  var totVid=0,totCap=0,startSec=0,p1v=0,p1c=0,p2v=0,p2c=0,idx=1,sep=false;
   var totalDecalaj=0; // decalajul cumulat de la ancore (capete citite mai lent/rapid)
   var p1EndSec=0; // startSec la momentul intrarii in P2 (dupa ancore)
   var adTimeSec=(adTime-startJ)/1000;
@@ -1266,7 +1266,7 @@ window.update = function() {
       }
       p1EndSec=startSec; // salvam startSec real la sfarsitul P1 (include decalajele ancorelor)
       var reincepeClock=fmtClock(new Date(startJ.getTime()+(startSec+adDur)*1000));
-      startSec+=adDur+12; sep=true; p2act+=12;
+      startSec+=adDur+12; sep=true; /* 12s generic in total */
       var td=row.querySelector('td');
       if(td) td.innerText='⬛ PUBLICITATE / PARTEA 2  ·  Reîncepe jurnal: '+reincepeClock+'  ·  +12s generic ⬛';
       return;
@@ -1301,7 +1301,7 @@ window.update = function() {
     if (title.toLowerCase().includes('coming up')||matchesWord(title,'c-up')||matchesWord(title,'pa')) row.classList.add('highlight-yellow'); else row.classList.remove('highlight-yellow');
     if(row.classList.contains('highlight-yellow')) row.classList.remove('highlight-ad-closest');
     else row.classList.remove('highlight-ad-closest'); // se aplica dupa loop
-    if (!sep) { p1v+=vid; p1c+=cap; } else { p2v+=vid; p2c+=cap; p2act+=total; }
+    if (!sep) { p1v+=vid; p1c+=cap; } else { p2v+=vid; p2c+=cap; }
     row.querySelector('.total').innerText=fmt(total);
     row.querySelector('.start').innerText=fmt(startSec);
     row.querySelector('.end').innerText=fmtClock(new Date(startJ.getTime()+(startSec+total)*1000));
@@ -1371,7 +1371,7 @@ function handleImport(event) {
     document.getElementById('meteoDuration').value=obj.meteoDuration||'03:30';
     document.getElementById('observatiiText').value=obj.observatii    ||'';
     document.querySelector('#table tbody').innerHTML='';
-    obj.rows.forEach(function(d){ addRow(d.part,d); });
+    obj.rows.forEach(function(d){ addRow(d.part,d,true); });
     updateAndSave();
   };
   reader.readAsText(file);
