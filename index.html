@@ -188,8 +188,10 @@
   .highlight-ad-closest td { color: #80ffb8 !important; }
   .highlight-ad-closest td input { color: #80ffb8 !important; }
   .highlight-ad-closest .total, .highlight-ad-closest .start, .highlight-ad-closest .end { color: #00e676 !important; font-weight: 700; }
-  .finished { background: linear-gradient(90deg, #3a0000 0%, #200000 100%) !important; opacity: 0.7; }
-  .finished td { color: #ff6060 !important; text-decoration: line-through; }
+  .finished { background: linear-gradient(90deg, #3a0000 0%, #200000 100%) !important; opacity: 0.92; }
+  .finished td { color: #ff8a8a !important; text-decoration: line-through; }
+  /* Coloanele de timp (total/start/sfarsit) raman citibile — fara taiere, text mai deschis */
+  .finished .total, .finished .start, .finished .end { text-decoration: none !important; color: #ffb0b0 !important; font-weight: 600; }
   /* ── MOVE FLASH ANIMATION ── */
   @keyframes rowMoveFlash {
     0%   { background-color: #1a6a2a !important; box-shadow: inset 0 0 0 2px #44ff88; }
@@ -1153,16 +1155,20 @@ function moveUp(btn) {
   if(isViewerMode) return; pushUndo();
   var row=btn.closest('tr');
   var prev=row.previousElementSibling;
-  var crossedSep=false;
-  while (prev && (prev.classList.contains('clock-anchor') || prev.classList.contains('separator'))) {
-    if (prev.classList.contains('separator')) crossedSep=true;
-    prev=prev.previousElementSibling;
-  }
-  if(prev) {
-    row.parentNode.insertBefore(row,prev);
-    if (crossedSep) row.dataset.part = partByPosition(row);
+  // Verificam daca elementul de dinainte (sarind ancore) e separatorul
+  var probe=prev;
+  while (probe && probe.classList.contains('clock-anchor')) probe=probe.previousElementSibling;
+  if (probe && probe.classList.contains('separator')) {
+    // Primul din partea lui, deasupra e separatorul → il mutam INAINTE de separator (in P1)
+    row.parentNode.insertBefore(row, probe);
+    row.dataset.part = partByPosition(row);
     flashRow(row);
+    updateAndSave();
+    return;
   }
+  // Mutare normala: sarim peste ancore
+  while (prev && prev.classList.contains('clock-anchor')) prev=prev.previousElementSibling;
+  if(prev && !prev.classList.contains('separator')) { row.parentNode.insertBefore(row,prev); flashRow(row); }
   updateAndSave();
 }
 function moveDown(btn) {
@@ -1191,7 +1197,43 @@ function moveDown(btn) {
 var ANCHOR_INTERVAL = 5; // trebuie definit înainte de update()
 
 // ── UPDATE ───────────────────────────────────────────────────────
+// Asigura ca separatorul e pozitionat corect: dupa ultima stire part1, inainte de prima part2.
+// Se bazeaza pe dataset.part (sursa de adevar), nu pe pozitia fizica curenta.
+function ensureSeparatorPosition() {
+  var tbody = document.querySelector('#table tbody');
+  if (!tbody) return;
+  var sep = tbody.querySelector('.separator');
+  if (!sep) return; // fara separator nu avem P2
+
+  // Gasim prima stire cu dataset.part='part2' (ignorand ancore/separator)
+  var firstP2 = null;
+  Array.from(tbody.querySelectorAll('tr')).forEach(function(r){
+    if (r.classList.contains('separator') || r.classList.contains('clock-anchor')) return;
+    if (r.dataset.part === 'part2' && !firstP2) firstP2 = r;
+  });
+
+  if (firstP2) {
+    // Separatorul trebuie sa fie IMEDIAT inainte de prima stire P2.
+    // Verificam daca e deja acolo (sarind ancore inaintea firstP2)
+    var beforeP2 = firstP2.previousElementSibling;
+    while (beforeP2 && beforeP2.classList.contains('clock-anchor')) beforeP2 = beforeP2.previousElementSibling;
+    if (beforeP2 !== sep) {
+      tbody.insertBefore(sep, firstP2);
+    }
+  } else {
+    // Nu exista stiri P2 → separatorul se muta la sfarsit (dupa toate randurile)
+    // ca sa nu imparta gresit randurile P1
+    if (sep.nextElementSibling) {
+      tbody.appendChild(sep);
+    }
+  }
+}
+
+
 window.update = function() {
+  // Repozitionam separatorul corect: dupa ultima stire part1, inainte de prima part2.
+  // Altfel o stire part2 aflata fizic inaintea separatorului nu e numarata in Partea 2.
+  ensureSeparatorPosition();
   // Gestionăm rândurile ancoră ÎNAINTE de loop — altfel le distrugem după ce setăm diffEl
   ensureAnchorRows();
   var rows=document.querySelectorAll('#table tbody tr');
@@ -1204,9 +1246,24 @@ window.update = function() {
   var p1EndSec=0; // startSec la momentul intrarii in P2 (dupa ancore)
   var adTimeSec=(adTime-startJ)/1000;
   var bestRow=null,bestDiff=Infinity;
+  // Verificam daca exista efectiv stiri cu titlu in Partea 2 (dupa separator)
+  var p2HasContent = false;
+  var seenSep = false;
+  Array.from(rows).forEach(function(r){
+    if (r.classList.contains('separator')) { seenSep = true; return; }
+    if (!seenSep || r.classList.contains('clock-anchor')) return;
+    var t = r.cells && r.cells[1] ? r.cells[1].querySelector('input')?.value : '';
+    if (t) p2HasContent = true;
+  });
   // bestRow se calculeaza in loop-ul principal unde startSec include ancorele
   rows.forEach(function(row) {
     if (row.classList.contains('separator')) {
+      if (!p2HasContent) {
+        // Partea 2 e goala — separatorul nu adauga nimic la calcul
+        var td0=row.querySelector('td');
+        if(td0) td0.innerText='⬛ PUBLICITATE / PARTEA 2 ⬛';
+        return;
+      }
       p1EndSec=startSec; // salvam startSec real la sfarsitul P1 (include decalajele ancorelor)
       var reincepeClock=fmtClock(new Date(startJ.getTime()+(startSec+adDur)*1000));
       startSec+=adDur+12; sep=true; p2act+=12;
