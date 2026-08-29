@@ -1570,18 +1570,12 @@ function ensureAnchorRows() {
   var tbody = document.querySelector('#table tbody');
   var allRows = Array.from(tbody.querySelectorAll('tr'));
 
-  // Salvăm valorile ancorelor existente, indexate după câte rânduri P1 sunt înaintea lor
-  var anchorValueByPos = {};
-  var p1Count = 0;
+  // Salvăm orele ancorelor în ORDINEA lor (ancora 1,2,3...), NU pe poziție.
+  // Altfel, dacă scoți o știre, cheia nu se mai potrivește și ora ancorei se pierde.
+  var anchorValues = [];
   allRows.forEach(function(row) {
-    if (row.classList.contains('separator')) return;
     if (row.classList.contains('clock-anchor')) {
-      anchorValueByPos[p1Count] = row.querySelector('input.anchor-time').value;
-      return;
-    }
-    if (row.dataset.part === 'part1') {
-      var title = row.cells && row.cells[1] ? row.cells[1].querySelector('input')?.value : '';
-      if (title) p1Count++;
+      anchorValues.push(row.querySelector('input.anchor-time').value);
     }
   });
 
@@ -1601,8 +1595,10 @@ function ensureAnchorRows() {
     if (count % ANCHOR_INTERVAL === 0) insertPoints.push({ after: row, pos: count });
   });
 
-  insertPoints.reverse().forEach(function(pt) {
-    var savedVal = anchorValueByPos[pt.pos] || '';
+  var totalPoints = insertPoints.length;
+  insertPoints.reverse().forEach(function(pt, revIdx) {
+    var orderIdx = totalPoints - 1 - revIdx;
+    var savedVal = anchorValues[orderIdx] || '';
     var anchorRow = makeAnchorRow(savedVal);
     var next = pt.after.nextElementSibling;
     if (next) tbody.insertBefore(anchorRow, next); else tbody.appendChild(anchorRow);
@@ -1610,33 +1606,20 @@ function ensureAnchorRows() {
 }
 
 function getAnchorData() {
-  var allRows = Array.from(document.querySelectorAll('#table tbody tr'));
-  var data = []; var p1Count = 0;
-  allRows.forEach(function(row) {
-    if (row.classList.contains('separator')) return;
-    if (row.classList.contains('clock-anchor')) {
-      data.push({ pos: p1Count, value: row.querySelector('input.anchor-time').value });
-      return;
-    }
-    if (row.dataset.part === 'part1') p1Count++;
+  // Ore salvate în ordine (index 0,1,2...) — robust la ștergeri/adăugări de rânduri
+  var data = [];
+  Array.from(document.querySelectorAll('#table tbody tr.clock-anchor')).forEach(function(row, i) {
+    data.push({ idx: i, value: row.querySelector('input.anchor-time').value });
   });
   return data;
 }
 
 function restoreAnchorData(anchors) {
   if (!anchors || !anchors.length) return;
-  var allRows = Array.from(document.querySelectorAll('#table tbody tr'));
-  var p1Count = 0;
-  var anchorByPos = {};
-  anchors.forEach(function(a){ anchorByPos[a.pos] = a.value; });
-  allRows.forEach(function(row) {
-    if (row.classList.contains('separator')) return;
-    if (row.classList.contains('clock-anchor')) {
-      if (anchorByPos[p1Count] !== undefined)
-        row.querySelector('input.anchor-time').value = anchorByPos[p1Count];
-      return;
-    }
-    if (row.dataset.part === 'part1') p1Count++;
+  // Restaurare pe ORDINE (a i-a ancoră ← a i-a valoare salvată)
+  var vals = anchors.map(function(a){ return a.value; });
+  Array.from(document.querySelectorAll('#table tbody tr.clock-anchor')).forEach(function(row, i) {
+    if (vals[i] !== undefined) row.querySelector('input.anchor-time').value = vals[i];
   });
 }
 window.restoreAnchorData = restoreAnchorData;
