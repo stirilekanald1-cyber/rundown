@@ -1196,6 +1196,11 @@ function moveDown(btn) {
 }
 
 var ANCHOR_INTERVAL = 5; // trebuie definit înainte de update()
+// Decalajul fiecarei ancore fata de pozitia standard (5,10,15...)
+var anchorDeltas = [];
+function anchorIndexOf(anchorRow) {
+  return Array.from(document.querySelectorAll('#table tbody tr.clock-anchor')).indexOf(anchorRow);
+}
 
 // ── UPDATE ───────────────────────────────────────────────────────
 // Asigura ca separatorul e pozitionat corect: dupa ultima stire part1, inainte de prima part2.
@@ -1294,8 +1299,7 @@ window.update = function() {
       return;
     }
     var title = row.cells[1].querySelector('input').value;
-    // Numerotam doar randurile cu titlu
-    row.cells[0].innerText = title ? (idx++) : '';
+    row.cells[0].innerText = idx++;
     // Randurile fara titlu sunt doar locuri goale — NU intra in calculul duratelor
     var vid=title ? (parseSec(row.cells[2].querySelector('input').value)||0) : 0;
     var cap=title ? (parseSec(row.cells[3].querySelector('input').value)||0) : 0;
@@ -1586,16 +1590,20 @@ function ensureAnchorRows() {
 
   // Reinserăm din 5 în 5, doar în Partea 1 (înainte de separator)
   var freshRows = Array.from(tbody.querySelectorAll('tr'));
-  var count = 0; var hitSep = false; var insertPoints = [];
+  var count = 0; var hitSep = false; var insertPoints = []; var titledRows = [];
   freshRows.forEach(function(row) {
     if (row.classList.contains('separator')) { hitSep = true; return; }
     if (hitSep || row.classList.contains('clock-anchor')) return;
-    // Ignorăm rândul gol inițial (fără titlu) — altfel ancora apare o știre mai devreme
-    var title = row.cells && row.cells[1] ? row.cells[1].querySelector('input')?.value : '';
-    if (!title) return;
-    count++;
-    if (count % ANCHOR_INTERVAL === 0) insertPoints.push({ after: row, pos: count });
+    count++; titledRows.push(row);
   });
+  var nrAnchors = Math.floor(count / ANCHOR_INTERVAL);
+  var lastPos = 0;
+  for (var ai = 0; ai < nrAnchors; ai++) {
+    var pos = (ai + 1) * ANCHOR_INTERVAL;   // fix din 5 in 5
+    if (pos > count) pos = count;
+    lastPos = pos;
+    insertPoints.push({ after: titledRows[pos - 1], pos: pos });
+  }
 
   var totalPoints = insertPoints.length;
   insertPoints.reverse().forEach(function(pt, revIdx) {
@@ -1611,7 +1619,7 @@ function getAnchorData() {
   // Ore salvate în ordine (index 0,1,2...) — robust la ștergeri/adăugări de rânduri
   var data = [];
   Array.from(document.querySelectorAll('#table tbody tr.clock-anchor')).forEach(function(row, i) {
-    data.push({ idx: i, value: row.querySelector('input.anchor-time').value });
+    data.push({ idx: i, value: row.querySelector('input.anchor-time').value, delta: anchorDeltas[i] || 0 });
   });
   return data;
 }
@@ -1619,6 +1627,7 @@ function getAnchorData() {
 function restoreAnchorData(anchors) {
   if (!anchors || !anchors.length) return;
   // Restaurare pe ORDINE (a i-a ancoră ← a i-a valoare salvată)
+  anchorDeltas = anchors.map(function(a){ return a.delta || 0; });
   var vals = anchors.map(function(a){ return a.value; });
   Array.from(document.querySelectorAll('#table tbody tr.clock-anchor')).forEach(function(row, i) {
     if (vals[i] !== undefined) row.querySelector('input.anchor-time').value = vals[i];
