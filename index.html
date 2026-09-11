@@ -1293,10 +1293,12 @@ window.update = function() {
       }
       return;
     }
-    row.cells[0].innerText=idx++;
-    var title=row.cells[1].querySelector('input').value;
-    var vid=parseSec(row.cells[2].querySelector('input').value)||0;
-    var cap=parseSec(row.cells[3].querySelector('input').value)||0;
+    var title = row.cells[1].querySelector('input').value;
+    // Numerotam doar randurile cu titlu
+    row.cells[0].innerText = title ? (idx++) : '';
+    // Randurile fara titlu sunt doar locuri goale — NU intra in calculul duratelor
+    var vid=title ? (parseSec(row.cells[2].querySelector('input').value)||0) : 0;
+    var cap=title ? (parseSec(row.cells[3].querySelector('input').value)||0) : 0;
     var total=vid+cap;
     if (title.toLowerCase().includes('coming up')||matchesWord(title,'c-up')||matchesWord(title,'pa')) row.classList.add('highlight-yellow'); else row.classList.remove('highlight-yellow');
     if(row.classList.contains('highlight-yellow')) row.classList.remove('highlight-ad-closest');
