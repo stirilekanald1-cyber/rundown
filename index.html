@@ -453,7 +453,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <div id="loadingOverlay">
   <div class="load-logo"><span class="load-logo-icon"></span>STIRI</div>
   <div class="load-spinner"></div>
-  <p>Se încarcă rundown-ul...</p>
+  <p id="loadingText">Se încarcă rundown-ul...</p>
+  <p id="loadingMsg" style="display:none;max-width:560px;text-align:center;line-height:1.5;color:#ffb0b0;letter-spacing:0"></p>
+  <button id="loadingRetry" style="display:none;padding:8px 22px;font-size:14px;cursor:pointer" onclick="location.reload()">🔄 Reîncearcă</button>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -620,13 +622,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCeFIhxZvOTJ3ZxcB9O1fGvMbNcP_-u_C4",
-  authDomain: "kanal-d-rundown.firebaseapp.com",
-  databaseURL: "https://kanal-d-rundown-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kanal-d-rundown",
-  storageBucket: "kanal-d-rundown.firebasestorage.app",
-  messagingSenderId: "185102941688",
-  appId: "1:185102941688:web:72d2651507669f9c0e2a0d"
+  apiKey: "AIzaSyAQNs2sLtZ7g3caKxj1nsD62Mf9yajEeV4",
+  authDomain: "baza-de-date-desf.firebaseapp.com",
+  databaseURL: "https://baza-de-date-desf-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "baza-de-date-desf",
+  storageBucket: "baza-de-date-desf.firebasestorage.app",
+  messagingSenderId: "17955298927",
+  appId: "1:17955298927:web:d5293248116018fb4cf79a"
 };
 
 // ══ SECRET TOKEN — același cu cel din Firebase Rules ══
@@ -640,19 +642,43 @@ const tokenRef    = ref(db, 'rundown/token');
 let ignoreNextRemote = false;
 window._setIgnoreNext = function() { ignoreNextRemote = true; };
 
+// Token-ul se scrie o singura data, INAINTE de prima scriere de date: regulile Firebase
+// accepta scrierea datelor doar daca token-ul exista deja in baza.
+let tokenReady = null;
 window._fbSave = function(data) {
   ignoreNextRemote = true;
   setSyncStatus('saving');
-  set(rundownRef, data)
+  if (!tokenReady) tokenReady = set(tokenRef, WRITE_TOKEN).catch(() => { tokenReady = null; });
+  tokenReady
+    .then(() => set(rundownRef, data))
     .then(() => { setSyncStatus('synced'); })
-    .catch(() => { setSyncStatus('error'); });
-  // Scrie token-ul separat (folosit de Firebase Rules pentru validare scriere)
-  set(tokenRef, WRITE_TOKEN).catch(() => {});
+    .catch(() => { ignoreNextRemote = false; setSyncStatus('error'); });
 };
 
 window._fbListen = function() {
   document.getElementById('loadingOverlay').style.display = 'flex';
   let firstLoad = true;
+  let lastErrCode = '';
+
+  // Afiseaza motivul in overlay in loc sa lase simbolul de asteptare la nesfarsit
+  function showLoadProblem(text) {
+    const msg = document.getElementById('loadingMsg');
+    const retry = document.getElementById('loadingRetry');
+    const spin = document.querySelector('#loadingOverlay .load-spinner');
+    if (msg) { msg.innerText = text; msg.style.display = 'block'; }
+    if (retry) retry.style.display = 'inline-block';
+    if (spin && lastErrCode) spin.style.display = 'none';
+  }
+
+  // Dupa 10 secunde fara raspuns de la baza de date, explicam ce se intampla
+  setTimeout(() => {
+    if (!firstLoad) return;
+    showLoadProblem('Baza de date nu răspunde de 10 secunde.' +
+      (lastErrCode ? ' Cod eroare: ' + lastErrCode + '.' : '') +
+      ' Verifică internetul și că nu e blocat Firebase (firewall, adblock). ' +
+      'Dacă merge pe alt calculator/telefon, problema e doar la acest dispozitiv.');
+  }, 10000);
+
   onValue(rundownRef, (snapshot) => {
     if (firstLoad) {
       firstLoad = false;
@@ -667,6 +693,18 @@ window._fbListen = function() {
     if (!data) return;
     setSyncStatus('synced');
     loadRemoteData(data);
+  }, (err) => {
+    // Firebase a refuzat/intrerupt citirea (ex. permission_denied) — pana acum erau ignorate in tacere
+    lastErrCode = (err && (err.code || err.message)) || 'necunoscut';
+    console.error('Firebase onValue error:', err);
+    if (firstLoad) {
+      const permis = /permission/i.test(lastErrCode);
+      showLoadProblem((permis
+        ? 'Baza de date a refuzat citirea (permission_denied). Cel mai probabil au expirat sau s-au schimbat regulile din Firebase Console → Realtime Database → Rules.'
+        : 'Nu mă pot conecta la baza de date.') + ' Cod eroare: ' + lastErrCode + '.');
+    } else {
+      setSyncStatus('error');
+    }
   });
 };
 
