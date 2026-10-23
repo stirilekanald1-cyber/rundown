@@ -620,6 +620,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, setPersistence, browserSessionPersistence, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQNs2sLtZ7g3caKxj1nsD62Mf9yajEeV4",
@@ -631,26 +632,49 @@ const firebaseConfig = {
   appId: "1:17955298927:web:d5293248116018fb4cf79a"
 };
 
-// ══ SECRET TOKEN — același cu cel din Firebase Rules ══
-const WRITE_TOKEN = "kd2026xR7mQ9";
-
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
 const rundownRef  = ref(db, 'rundown/data');
-const tokenRef    = ref(db, 'rundown/token');
+
+// ══ AUTENTIFICARE — Firebase Authentication ══
+// Parolele NU mai sunt in cod: se verifica la Firebase. Emailurile conturilor nu sunt secrete.
+const EDITOR_EMAIL = "prod@regie.exemplu.com";
+const VIEWER_EMAIL = "viz@redactie.exemplu.com";
+const auth = getAuth(app);
+// Sesiune pe tab (ca inainte): refresh pastreaza login-ul, inchiderea tab-ului il scoate
+const persistReady = setPersistence(auth, browserSessionPersistence).catch(() => {});
+
+// Incearca parola pe contul de editor, apoi pe cel de viewer
+window._fbLogin = async function(pwd) {
+  await persistReady;
+  let lastCode = '';
+  for (const email of [EDITOR_EMAIL, VIEWER_EMAIL]) {
+    try { await signInWithEmailAndPassword(auth, email, pwd); return { ok: true }; }
+    catch (e) {
+      lastCode = (e && e.code) || '';
+      if (lastCode === 'auth/too-many-requests' || lastCode === 'auth/network-request-failed') return { error: lastCode };
+    }
+  }
+  return { error: lastCode || 'auth/invalid-credential' };
+};
+window._fbLogout = function() { return signOut(auth); };
+
+// Punctul UNIC in care se aplica rolul: dupa login sau la restaurarea sesiunii
+onAuthStateChanged(auth, (user) => {
+  if (!user) return;
+  const role = user.email === EDITOR_EMAIL ? 'editor' : user.email === VIEWER_EMAIL ? 'viewer' : null;
+  if (!role) { signOut(auth); return; }
+  console.info('Autentificat ca', role, '(uid ' + user.uid + ')');
+  window.applyRole(role);
+});
 
 let ignoreNextRemote = false;
 window._setIgnoreNext = function() { ignoreNextRemote = true; };
 
-// Token-ul se scrie o singura data, INAINTE de prima scriere de date: regulile Firebase
-// accepta scrierea datelor doar daca token-ul exista deja in baza.
-let tokenReady = null;
 window._fbSave = function(data) {
   ignoreNextRemote = true;
   setSyncStatus('saving');
-  if (!tokenReady) tokenReady = set(tokenRef, WRITE_TOKEN).catch(() => { tokenReady = null; });
-  tokenReady
-    .then(() => set(rundownRef, data))
+  set(rundownRef, data)
     .then(() => { setSyncStatus('synced'); })
     .catch(() => { ignoreNextRemote = false; setSyncStatus('error'); });
 };
@@ -700,7 +724,7 @@ window._fbListen = function() {
     if (firstLoad) {
       const permis = /permission/i.test(lastErrCode);
       showLoadProblem((permis
-        ? 'Baza de date a refuzat citirea (permission_denied). Cel mai probabil au expirat sau s-au schimbat regulile din Firebase Console → Realtime Database → Rules.'
+        ? 'Contul tău nu are drept de citire (permission_denied). Verifică în Firebase Console → Realtime Database → Rules că UID-urile sunt cele din Authentication → Users.'
         : 'Nu mă pot conecta la baza de date.') + ' Cod eroare: ' + lastErrCode + '.');
     } else {
       setSyncStatus('error');
@@ -776,19 +800,15 @@ function loadRemoteData(obj) {
 ══════════════════════════════════════════════ -->
 <script>
 
-var EDITOR_PASSWORD = "Prod regie2026";
-var VIEWER_PASSWORD = "Viz redactie2026";
-
-var SESSION_KEY    = 'kd_rundown_session';
 var SESSION_EDITOR = 'editor';
 var SESSION_VIEWER = 'viewer';
 var isViewerMode   = false;
+var roleApplied    = false;
 
-function saveSession(role) { try { sessionStorage.setItem(SESSION_KEY, role); } catch(e){} }
-function loadSession()     { try { return sessionStorage.getItem(SESSION_KEY); } catch(e){ return null; } }
-function clearSession()    { try { sessionStorage.removeItem(SESSION_KEY); } catch(e){} }
-
+// Se apeleaza o singura data, din onAuthStateChanged (dupa login sau la restaurarea sesiunii)
 function applyRole(role) {
+  if (roleApplied) return;
+  roleApplied = true;
   document.getElementById('loginOverlay').style.display = 'none';
   if (role === SESSION_VIEWER) {
     isViewerMode = true;
@@ -801,29 +821,27 @@ function applyRole(role) {
   window._startFirebase();
 }
 
-function tryLogin() {
-  var pwd = document.getElementById('pwdInput').value;
-  if (pwd === EDITOR_PASSWORD) {
-    saveSession(SESSION_EDITOR); applyRole(SESSION_EDITOR);
-  } else if (pwd === VIEWER_PASSWORD) {
-    saveSession(SESSION_VIEWER); applyRole(SESSION_VIEWER);
-  } else {
-    document.getElementById('loginError').innerText = '❌ Parolă incorectă.';
-    document.getElementById('pwdInput').value = '';
-  }
+async function tryLogin() {
+  var inp = document.getElementById('pwdInput');
+  var err = document.getElementById('loginError');
+  var pwd = inp.value;
+  if (!pwd) { err.innerText = 'Scrie parola.'; return; }
+  if (!window._fbLogin) { err.innerText = '⏳ Firebase se încarcă încă — mai încearcă peste câteva secunde (sau verifică internetul).'; return; }
+  err.innerText = 'Se verifică...';
+  var res;
+  try { res = await window._fbLogin(pwd); } catch (e) { res = { error: (e && e.code) || 'eroare' }; }
+  if (res && res.ok) { err.innerText = ''; return; }   // rolul se aplica din onAuthStateChanged
+  err.innerText =
+    res.error === 'auth/too-many-requests'      ? '⚠️ Prea multe încercări. Așteaptă câteva minute.' :
+    res.error === 'auth/network-request-failed' ? '⚠️ Fără conexiune la Firebase. Verifică internetul.' :
+                                                  '❌ Parolă incorectă.';
+  inp.value = '';
 }
 
 function doLogout() {
-  clearSession();
-  location.reload();
+  var done = function() { location.reload(); };
+  try { (window._fbLogout ? window._fbLogout() : Promise.resolve()).then(done, done); } catch (e) { done(); }
 }
-
-(function checkSession() {
-  var role = loadSession();
-  if (role === SESSION_EDITOR || role === SESSION_VIEWER) {
-    window.addEventListener('load', function() { applyRole(role); });
-  }
-})();
 
 // ── VIEWER INFO BAR ───────────────────────────────────────────────
 // Sincronizează valorile din câmpurile ascunse în panoul viewer (read-only)
